@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>나만의 비밀 투두리스트</title>
+    <title>투두리스트</title>
     <style>
         body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f9f9f9; margin: 0; }
-        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 380px; }
+        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 350px; }
         h2 { text-align: center; color: #333; margin-top: 0; }
-        .input-group { display: flex; margin-bottom: 15px; }
+        .input-group { display: flex; margin-bottom: 20px; }
         .auth-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
         .row-group { display: flex; gap: 8px; }
         .row-group input { flex: 1; }
@@ -18,22 +18,13 @@
         .btn-secondary { background-color: #2196F3; }
         .btn-info { background-color: #ff9800; font-size: 13px; white-space: nowrap; padding: 10px; }
         .btn-info:disabled { background-color: #cca46a; cursor: not-allowed; }
-        .btn-danger { background-color: #ff4d4d; border-radius: 4px; padding: 5px 10px; font-size: 12px; }
-        
-        /* 탭 스타일 추가 */
-        .tab-group { display: flex; gap: 5px; margin-bottom: 15px; background: #eee; padding: 3px; border-radius: 6px; }
-        .tab-btn { flex: 1; padding: 8px; border: none; background: none; font-size: 13px; font-weight: bold; color: #666; cursor: pointer; border-radius: 4px; }
-        .tab-btn.active { background: white; color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-
-        ul { list-style: none; padding: 0; margin: 0; }
+        .btn-danger { background-color: #ff4d4d; padding: 5px 10px; font-size: 12px; }
+        ul { list-style: none; padding: 0; }
         li { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        li.completed span { text-decoration: line-through; color: #aaa; }
-        .todo-left { display: flex; align-items: center; gap: 10px; }
-        .todo-checkbox { width: 16px; height: 16px; cursor: pointer; }
-
+        
         .hidden { display: none !important; }
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .btn-logout { background-color: #aaa; font-size: 11px; padding: 5px 10px; }
+        .header-box { display: flex; justify-content: space-between; align-items: center; }
+        .btn-logout { background-color: #aaa; font-size: 11px; padding: 5px; }
         .switch-link { text-align: center; font-size: 13px; color: #666; margin-top: 15px; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
@@ -93,15 +84,9 @@
         <button class="btn btn-logout" onclick="handleLogout()">로그아웃</button>
     </div>
     
-    <div class="input-group">
+    <div class="input-group" style="width: 100%;">
         <input type="text" id="todoInput" placeholder="새로운 할 일을 입력하세요..." style="flex: 1; border-radius: 4px 0 0 4px;">
         <button class="btn btn-primary" onclick="addTodo()" style="border-radius: 0 4px 4px 0;">등록</button>
-    </div>
-
-    <div class="tab-group">
-        <button id="tab-all" class="tab-btn active" onclick="changeTab('all')">전체</button>
-        <button id="tab-active" class="tab-btn" onclick="changeTab('active')">할 일</button>
-        <button id="tab-completed" class="tab-btn" onclick="changeTab('completed')">완료</button>
     </div>
     
     <ul id="todoList"></ul>
@@ -109,164 +94,246 @@
 
 <script>
     const BACKEND_URL = "http://127.0.0.1:8000";
-    let currentTab = 'all'; // 'all', 'active', 'completed'
-    let todoListData = [];  // 백엔드에서 받아온 투두 배열 임시 저장 공간
 
     window.onload = function() {
         const token = localStorage.getItem("token");
-        if (token) { showTodoSection(); loadTodos(); } else { showLoginSection(); }
+        if (token) {
+            showTodoSection();
+            loadTodos();
+        } else {
+            showLoginSection();
+        }
     };
 
+    // 모든 입력창 청소 함수
     function clearAllInputs() {
-        document.getElementById("loginId").value = ""; document.getElementById("loginPw").value = "";
-        document.getElementById("regId").value = ""; document.getElementById("regPw").value = "";
-        document.getElementById("regPwConfirm").value = ""; document.getElementById("regEmail").value = "";
-        document.getElementById("regCode").value = ""; document.getElementById("resetEmail").value = "";
-        document.getElementById("resetCode").value = ""; document.getElementById("resetNewPw").value = "";
+        document.getElementById("loginId").value = "";
+        document.getElementById("loginPw").value = "";
+        
+        document.getElementById("regId").value = "";
+        document.getElementById("regPw").value = "";
+        document.getElementById("regPwConfirm").value = "";
+        document.getElementById("regEmail").value = "";
+        document.getElementById("regCode").value = "";
+        
+        document.getElementById("resetEmail").value = "";
+        document.getElementById("resetCode").value = "";
+        document.getElementById("resetNewPw").value = "";
         document.getElementById("resetNewPwConfirm").value = "";
     }
 
-    function showLoginSection() { clearAllInputs(); document.getElementById("loginSection").classList.remove("hidden"); document.getElementById("registerSection").classList.add("hidden"); document.getElementById("resetSection").classList.add("hidden"); document.getElementById("todoSection").classList.add("hidden"); }
-    function showRegisterSection() { clearAllInputs(); document.getElementById("loginSection").classList.add("hidden"); document.getElementById("registerSection").classList.remove("hidden"); document.getElementById("resetSection").classList.add("hidden"); document.getElementById("todoSection").classList.add("hidden"); }
-    function showResetSection() { clearAllInputs(); document.getElementById("loginSection").classList.add("hidden"); document.getElementById("registerSection").classList.add("hidden"); document.getElementById("resetSection").classList.remove("hidden"); document.getElementById("todoSection").classList.add("hidden"); }
-    function showTodoSection() { clearAllInputs(); document.getElementById("loginSection").classList.add("hidden"); document.getElementById("registerSection").classList.add("hidden"); document.getElementById("resetSection").classList.add("hidden"); document.getElementById("todoSection").classList.remove("hidden"); }
-
-    function getAuthHeader() { return { "Authorization": `Bearer ${localStorage.getItem("token")}` }; }
-
-    // 탭 변경 로직
-    function changeTab(tabName) {
-        currentTab = tabName;
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`tab-${tabName}`).classList.add('active');
-        renderTodos();
+    // 화면 전환 함수들
+    function showLoginSection() {
+        clearAllInputs();
+        document.getElementById("loginSection").classList.remove("hidden");
+        document.getElementById("registerSection").classList.add("hidden");
+        document.getElementById("resetSection").classList.add("hidden");
+        document.getElementById("todoSection").classList.add("hidden");
+    }
+    function showRegisterSection() {
+        clearAllInputs();
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("registerSection").classList.remove("hidden");
+        document.getElementById("resetSection").classList.add("hidden");
+        document.getElementById("todoSection").classList.add("hidden");
+    }
+    function showResetSection() {
+        clearAllInputs();
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("registerSection").classList.add("hidden");
+        document.getElementById("resetSection").classList.remove("hidden");
+        document.getElementById("todoSection").classList.add("hidden");
+    }
+    function showTodoSection() {
+        clearAllInputs();
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("registerSection").classList.add("hidden");
+        document.getElementById("resetSection").classList.add("hidden");
+        document.getElementById("todoSection").classList.remove("hidden");
     }
 
-    // 데이터 기반 화면 렌더링 (탭별로 필터링해서 보여줌)
-    function renderTodos() {
-        const list = document.getElementById("todoList");
-        list.innerHTML = "";
-
-        todoListData.forEach(todo => {
-            if (currentTab === 'active' && todo.completed) return;
-            if (currentTab === 'completed' && !todo.completed) return;
-
-            const li = document.createElement("li");
-            li.id = `todo-${todo.id}`;
-            if (todo.completed) li.classList.add("completed");
-
-            li.innerHTML = `
-                <div class="todo-left">
-                    <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''} onclick="toggleTodo(${todo.id})">
-                    <span>${todo.content}</span>
-                </div>
-                <button class="btn btn-danger" onclick="deleteTodo(${todo.id})">X</button>
-            `;
-            list.appendChild(li);
-        });
-    }
-
-    // 회원가입 인증 요청
+    // 회원가입용 인증 요청
     async function handleRequestCode(event) {
         const email = document.getElementById("regEmail").value;
         if (!email) { alert("이메일을 입력해 주세요."); return; }
-        const targetBtn = event.target; targetBtn.disabled = true; targetBtn.innerText = "보내는 중...";
+
+        const targetBtn = event.target;
+        targetBtn.disabled = true;
+        targetBtn.innerText = "보내는 중...";
+
         try {
-            const response = await fetch(`${BACKEND_URL}/request-code`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+            const response = await fetch(`${BACKEND_URL}/request-code`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email })
+            });
             const data = await response.json();
-            alert(data.message || "인증번호가 발송되었습니다.");
-        } catch (error) { alert("네트워크 통신 중 오류가 발생했습니다."); } finally { targetBtn.disabled = false; targetBtn.innerText = "인증 요청"; }
+            if (response.ok) {
+                alert(data.message || "인증번호가 발송되었습니다.");
+            } else {
+                alert("실패: " + (data.detail || "오류가 발생했습니다."));
+            }
+        } catch (error) {
+            alert("네트워크 통신 중 오류가 발생했습니다.");
+        } finally {
+            targetBtn.disabled = false;
+            targetBtn.innerText = "인증 요청";
+        }
     }
 
     // 회원가입 완료
     async function handleRegister() {
-        const username = document.getElementById("regId").value; const password = document.getElementById("regPw").value;
-        const passwordConfirm = document.getElementById("regPwConfirm").value; const email = document.getElementById("regEmail").value;
+        const username = document.getElementById("regId").value;
+        const password = document.getElementById("regPw").value;
+        const passwordConfirm = document.getElementById("regPwConfirm").value;
+        const email = document.getElementById("regEmail").value;
         const code = document.getElementById("regCode").value;
-        if (!username || !password || !passwordConfirm || !email || !code) { alert("모든 필드를 다 입력해 주세요."); return; }
-        if (password !== passwordConfirm) { alert("비밀번호가 일치하지 않습니다."); return; }
 
-        const response = await fetch(`${BACKEND_URL}/signup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password, email, code }) });
-        const data = await response.json();
-        if (response.ok) { alert("회원가입 성공!"); showLoginSection(); } else { alert("실패: " + data.detail); }
+        if (!username || !password || !passwordConfirm || !email || !code) {
+            alert("모든 필드를 다 입력해 주세요.");
+            return;
+        }
+
+        if (password !== passwordConfirm) {
+            alert("입력하신 두 비밀번호가 서로 다릅니다. 다시 확인해 주세요.");
+            return;
+        }
+
+        const response = await fetch(`${BACKEND_URL}/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, email, code })
+        });
+
+        if (response.ok) {
+            alert("회원가입 성공! 로그인 화면으로 이동합니다.");
+            showLoginSection();
+        } else {
+            const data = await response.json();
+            alert("회원가입 실패: " + data.detail);
+        }
     }
 
-    // 비밀번호 재설정 인증 요청
+    // 비밀번호 재설정용 인증번호 요청
     async function handleRequestResetCode(event) {
         const email = document.getElementById("resetEmail").value;
         if (!email) { alert("이메일을 입력해 주세요."); return; }
-        const targetBtn = event.target; targetBtn.disabled = true; targetBtn.innerText = "보내는 중...";
+
+        const targetBtn = event.target;
+        targetBtn.disabled = true;
+        targetBtn.innerText = "보내는 중...";
+
         try {
-            const response = await fetch(`${BACKEND_URL}/request-reset-code`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+            const response = await fetch(`${BACKEND_URL}/request-reset-code`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email })
+            });
             const data = await response.json();
-            alert(data.message || "인증번호가 발송되었습니다.");
-        } catch (error) { alert("네트워크 통신 중 오류가 발생했습니다."); } finally { targetBtn.disabled = false; targetBtn.innerText = "인증 요청"; }
+            if (response.ok) {
+                alert(data.message || "인증번호가 발송되었습니다.");
+            } else {
+                alert("실패: " + (data.detail || "오류가 발생했습니다."));
+            }
+        } catch (error) {
+            alert("네트워크 통신 중 오류가 발생했습니다.");
+        } finally {
+            targetBtn.disabled = false;
+            targetBtn.innerText = "인증 요청";
+        }
     }
 
     // 비밀번호 변경 완료
     async function handleResetPassword() {
-        const email = document.getElementById("resetEmail").value; const code = document.getElementById("resetCode").value;
-        const new_password = document.getElementById("resetNewPw").value; const new_password_confirm = document.getElementById("resetNewPwConfirm").value;
-        if (!email || !code || !new_password || !new_password_confirm) { alert("모든 필드를 다 입력해 주세요."); return; }
-        if (new_password !== new_password_confirm) { alert("비밀번호가 일치하지 않습니다."); return; }
+        const email = document.getElementById("resetEmail").value;
+        const code = document.getElementById("resetCode").value;
+        const new_password = document.getElementById("resetNewPw").value;
+        const new_password_confirm = document.getElementById("resetNewPwConfirm").value;
 
-        const response = await fetch(`${BACKEND_URL}/reset-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code, new_password }) });
+        if (!email || !code || !new_password || !new_password_confirm) {
+            alert("모든 필드를 다 입력해 주세요.");
+            return;
+        }
+
+        if (new_password !== new_password_confirm) {
+            alert("새 비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+            return;
+        }
+
+        // 💡 주소 꼬임 방지를 위해 라우터 주소를 완전히 /reset-password로 매칭
+        const response = await fetch(`${BACKEND_URL}/reset-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, code, new_password })
+        });
+
         const data = await response.json();
-        if (response.ok) { alert(data.message || "비밀번호 변경 완료!"); showLoginSection(); } else { alert("실패: " + data.detail); }
+        if (response.ok) {
+            alert("비밀번호가 성공적으로 변경되었습니다! 변경된 비밀번호로 로그인하세요.");
+            showLoginSection();
+        } else {
+            alert("변경 실패: " + data.detail);
+        }
     }
 
     // 로그인
     async function handleLogin() {
-        const username = document.getElementById("loginId").value; const password = document.getElementById("loginPw").value;
-        const response = await fetch(`${BACKEND_URL}/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
+        const username = document.getElementById("loginId").value;
+        const password = document.getElementById("loginPw").value;
+        const response = await fetch(`${BACKEND_URL}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
         const data = await response.json();
-        if (response.ok) { localStorage.setItem("token", data.access_token); showTodoSection(); loadTodos(); } else { alert("로그인 실패: " + data.detail); }
+        if (response.ok) {
+            localStorage.setItem("token", data.access_token);
+            showTodoSection();
+            loadTodos();
+        } else { alert("로그인 실패: " + data.detail); }
     }
 
     // 로그아웃
-    function handleLogout() { localStorage.removeItem("token"); todoListData = []; showLoginSection(); }
+    function handleLogout() {
+        localStorage.removeItem("token");
+        document.getElementById("todoList").innerHTML = "";
+        showLoginSection();
+    }
 
-    // 투두 전체 가져오기
+    function getAuthHeader() { return { "Authorization": `Bearer ${localStorage.getItem("token")}` }; }
+
     async function loadTodos() {
         const response = await fetch(`${BACKEND_URL}/todos`, { headers: getAuthHeader() });
         if (response.ok) {
-            todoListData = await response.json();
-            renderTodos();
+            const todos = await response.json();
+            todos.forEach(todo => appendTodoItem(todo.id, todo.content));
         }
     }
 
-    // 투두 추가
     async function addTodo() {
-        const input = document.getElementById("todoInput"); if (!input.value) return;
-        const response = await fetch(`${BACKEND_URL}/todos`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify({ content: input.value }) });
-        if (response.ok) {
-            const newTodo = await response.json();
-            todoListData.push({ id: newTodo.id, content: newTodo.content, completed: false });
-            input.value = "";
-            renderTodos();
-        }
+        const input = document.getElementById("todoInput");
+        const content = input.value;
+        if (!content) return;
+        const response = await fetch(`${BACKEND_URL}/todos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...getAuthHeader() },
+            body: JSON.stringify({ content: content })
+        });
+        const data = await response.json();
+        if (response.ok) { appendTodoItem(data.id, data.content); input.value = ""; }
     }
 
-    // 💡 투두 완료 토글 (백엔드 PATCH 라우터 호출 구조)
-    async function toggleTodo(id) {
-        const response = await fetch(`${BACKEND_URL}/todos/${id}/toggle`, { method: "PATCH", headers: getAuthHeader() });
-        if (response.ok) {
-            const data = await response.json();
-            // 로컬 데이터 배열 상태 갱신 후 리렌더링
-            const index = todoListData.findIndex(t => t.id === id);
-            if (index !== -1) {
-                todoListData[index].completed = !todoListData[index].completed;
-                renderTodos();
-            }
-        }
-    }
-
-    // 투두 삭제
     async function deleteTodo(id) {
         const response = await fetch(`${BACKEND_URL}/todos/${id}`, { method: "DELETE", headers: getAuthHeader() });
-        if (response.ok) {
-            todoListData = todoListData.filter(t => t.id !== id);
-            renderTodos();
-        }
+        if (response.ok) document.getElementById(`todo-${id}`).remove();
+    }
+
+    function appendTodoItem(id, content) {
+        const list = document.getElementById("todoList");
+        const li = document.createElement("li");
+        li.id = `todo-${id}`;
+        li.innerHTML = `<span>${content}</span><button class="btn btn-danger" onclick="deleteTodo(${id})">X</button>`;
+        list.appendChild(li);
     }
 </script>
 </body>
