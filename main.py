@@ -18,7 +18,7 @@ load_dotenv()
 conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
     MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
-    MAIL_FROM=os.getenv("MAIL_USERNAME"),
+    MAIL_FROM=os.getenv("MAIL_FROM"),
     MAIL_PORT=587,
     MAIL_SERVER="smtp.gmail.com",
     MAIL_STARTTLS=True,
@@ -183,11 +183,11 @@ async def request_verification_code(email_data: dict, db: Session = Depends(get_
         subject="투두리스트 회원가입 인증번호입니다.",
         recipients=[user_email],
         body=f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요.",
-        subtype=MessageType.plain
+        subtype=MessageType.plain,
+        from_email="admin@hyunjae.co.kr"  # 👈 여기에 발신 주소 명시!
     )
     fm = FastMail(conf)
     await fm.send_message(message)
-    
     return {"message": "인증번호가 발송되었습니다. 메일함을 확인하세요!"}
 
 @app.post("/reset-password")
@@ -239,9 +239,9 @@ async def request_code(email_data: dict, db: Session = Depends(get_db)):
         subject="투두리스트 비밀번호 재설정 인증번호입니다.",
         recipients=[user_email],
         body=f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요.",
-        subtype=MessageType.plain
+        subtype=MessageType.plain,
+        from_email="admin@hyunjae.co.kr"  # 👈 여기도 똑같이 명시!
     )
     fm = FastMail(conf)
     await fm.send_message(message)
-
     return {"message": "인증번호가 발송되었습니다. 메일함을 확인하세요!"}
