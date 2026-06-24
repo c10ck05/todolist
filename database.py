@@ -1,0 +1,39 @@
+import os
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+load_dotenv()
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class TodoTable(Base):
+    __tablename__ = "todolist"
+    id = Column(Integer, primary_key=True, index=True)
+    todo = Column(Text, nullable=False)
+    owner_id = Column(String(50), nullable=False)
+
+class UserTable(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(50), unique=True, nullable=False)
+    password = Column(String(100), nullable=False)
+    email = Column(String(100), unique=True, nullable=False)
+
+class EmailVerificationTable(Base):
+    __tablename__ = "email_verifications"
+    
+    email = Column(String(100), primary_key=True)
+    code = Column(String(6), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
