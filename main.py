@@ -47,8 +47,7 @@ def get_db():
     finally:
         db.close()
 
-@app.get("/todos")
-def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+def get_current_user_id(authorization: Annotated[str | None, Header()] = None):
     try:
         decoded_payload = jwt.decode(authorization[7:], SECRET_KEY, algorithms=[ALGORITHM])
         user_id = decoded_payload.get("sub")
@@ -56,20 +55,20 @@ def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session
         raise HTTPException(status_code=401, detail="토큰이 만료되었습니다.")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+    return user_id
+
+
+@app.get("/todos")
+def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
     
     todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id).all()
-    return [{"id": t.id, "content": t.todo} for t in todos]
+    return [{"id": t.id, "content": t.todo, "completed": t.completed} for t in todos]
 
 @app.post("/todos")
 def create_todo(todo_data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
     content_from_front = todo_data.get("content")
-    try:
-        decoded_payload = jwt.decode(authorization[7:], SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = decoded_payload.get("sub")
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="토큰이 만료되었습니다.")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+    user_id = get_current_user_id(authorization)
 
     new_todo = TodoTable(todo=content_from_front, owner_id=user_id)
     
@@ -82,16 +81,8 @@ def create_todo(todo_data: dict, authorization: Annotated[str | None, Header()] 
 @app.delete("/todos/{id}")
 def delete_todo(id: int, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)): # 💡 id: int 콜론 수정
     todo_to_delete = db.query(TodoTable).filter(TodoTable.id == id).first()
-    try:
-        decoded_payload = jwt.decode(authorization[7:], SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = decoded_payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="인증 정보가 올바르지 않습니다.")
+    user_id = get_current_user_id(authorization)
 
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="토큰이 만료되었습니다.")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
     if not todo_to_delete:
         raise HTTPException(status_code=404, detail="해당 투두를 찾을 수 없습니다.")
     
@@ -101,6 +92,21 @@ def delete_todo(id: int, authorization: Annotated[str | None, Header()] = None, 
     db.commit()
     
     return {"message": "삭제 완료"}
+    
+
+@app.patch("/todos/{id}/toggle")
+def toggle_todo(id: int, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    update_todo_table = db.query(TodoTable).filter(TodoTable.id == id).first()
+
+    if not update_todo_table:
+        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
+    if update_todo_table.owner_id != user_id:
+        raise HTTPException(status_code=404, detail="본인 리스트가 아닙니다")
+
+    update_todo_table.completed = not update_todo_table.completed
+    db.commit()
+    return {"id": update_todo_table.id, "completed": update_todo_table.completed}
 
 @app.post("/signup")
 def signup_todo(user_data: dict, db: Session = Depends(get_db)):

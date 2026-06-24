@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -23,6 +23,7 @@ class TodoTable(Base):
     id = Column(Integer, primary_key=True, index=True)
     todo = Column(Text, nullable=False)
     owner_id = Column(String(50), nullable=False)
+    completed = Column(Boolean, default=False, nullable=False)
 
 class UserTable(Base):
     __tablename__ = "users"
