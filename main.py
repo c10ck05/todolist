@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable, engine, Base
 from datetime import datetime, timedelta
-import jwt  # 💡 상단에 라이브러리 임포트 필요
+import jwt
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
@@ -27,9 +27,6 @@ conf = ConnectionConfig(
     VALIDATE_CERTS=True
 )
 
-# 임시 임시 임시! 원래는 DB나 Redis에 저장해야 하지만, 
-# 일단 테스트용으로 메모리에 인증번호를 저장할 딕셔너리
-# 구조: {"사용자이메일": "6자리번호"}
 email_verification_store = {}
 
 Base.metadata.create_all(bind=engine)
