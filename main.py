@@ -21,8 +21,6 @@ def keep_alive():
     except:
         pass
 
-scheduler.add_job(keep_alive, 'interval', minutes=10)
-
 load_dotenv()
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
