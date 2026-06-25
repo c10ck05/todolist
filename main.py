@@ -16,7 +16,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 def keep_alive():
     try:
-        httpx.get("https://본인서버주소.onrender.com")
+        httpx.get("https://todolist-ezpr.onrender.com")
         print("✅ Keep alive ping 성공")
     except:
         pass
