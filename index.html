@@ -513,8 +513,8 @@
             <button class="tab-btn active" onclick="filterTodos('all', this)">전체</button>
             <button class="tab-btn" onclick="filterTodos('active', this)">할 일</button>
             <button class="tab-btn" onclick="filterTodos('completed', this)">완료</button>
-            <button class="tab-btn" onclick="filterTodos('overdue', this)">⚠️ 마감초과</button>
-            <button class="tab-btn" id="tab-timeline" onclick="switchToTimeline(this)">📅 타임라인</button>
+            <button class="tab-btn" onclick="filterTodos('overdue', this)">마감초과</button>
+            <button class="tab-btn" id="tab-timeline" onclick="switchToTimeline(this)">타임라인</button>
         </div>
 
         <!-- 리스트 뷰 -->
@@ -536,14 +536,14 @@
         const html = document.documentElement;
         const isDark = html.getAttribute('data-theme') === 'dark';
         html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-        document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+        document.getElementById('theme-btn').textContent = isDark ? '🌑' : '☀️';
         localStorage.setItem('theme', isDark ? 'light' : 'dark');
     }
     (function() {
         const saved = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', saved);
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('theme-btn').textContent = saved === 'dark' ? '☀️' : '🌙';
+            document.getElementById('theme-btn').textContent = saved === 'dark' ? '☀️' : '🌑';
         });
     })();
 
