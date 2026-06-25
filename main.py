@@ -26,9 +26,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-@app.get("/")
-def root():
-    return {"message": "Server is running!"}
+
 # =====================
 # 유틸 함수
 # =====================
