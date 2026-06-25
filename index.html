@@ -1,274 +1,935 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> 투두리스트</title>
-    <link rel="icon" type="image/png" href="./Todolist.png">
+    <title>TodoList</title>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f9f9f9; margin: 0; }
-        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 380px; }
-        h2 { text-align: center; color: #333; margin-top: 0; }
-        .input-group { display: flex; margin-bottom: 15px; }
-        .auth-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
-        .row-group { display: flex; gap: 8px; }
-        .row-group input { flex: 1; }
-        input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; font-size: 14px; }
-        .btn { padding: 12px; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 14px; }
-        .btn-primary { background-color: #4CAF50; }
-        .btn-secondary { background-color: #2196F3; }
-        .btn-info { background-color: #ff9800; font-size: 13px; white-space: nowrap; padding: 10px; }
-        .btn-info:disabled { background-color: #cca46a; cursor: not-allowed; }
-        .btn-danger { background-color: #ff4d4d; border-radius: 4px; padding: 5px 10px; font-size: 12px; }
-        
-        /* 탭 스타일 추가 */
-        .tab-group { display: flex; gap: 5px; margin-bottom: 15px; background: #eee; padding: 3px; border-radius: 6px; }
-        .tab-btn { flex: 1; padding: 8px; border: none; background: none; font-size: 13px; font-weight: bold; color: #666; cursor: pointer; border-radius: 4px; }
-        .tab-btn.active { background: white; color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        :root {
+            --bg: #f3f2ef;
+            --card-bg: #ffffff;
+            --text-primary: #1d2226;
+            --text-secondary: #56687a;
+            --input-border: #8896a4;
+            --input-border-focus: #0a66c2;
+            --input-bg: #ffffff;
+            --btn-primary: #0a66c2;
+            --btn-primary-hover: #004182;
+            --btn-primary-text: #ffffff;
+            --link-color: #0a66c2;
+            --card-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            --divider: #e0e0e0;
+            --alert-error-bg: #fff0f0;
+            --alert-error-color: #cc1016;
+            --alert-error-border: #ffd0d0;
+            --alert-success-bg: #f0faf0;
+            --alert-success-color: #057642;
+            --alert-success-border: #c6f0d8;
+            --todo-item-bg: #f8f9fa;
+            --todo-item-border: #e2e8f0;
+            --todo-item-hover: #eef3f8;
+            --tab-active-bg: #0a66c2;
+            --tab-border: #0a66c2;
+            --logout-bg: #fff0f0;
+            --logout-color: #cc1016;
+            --logout-border: #ffd0d0;
+            --spinner-color: rgba(255,255,255,0.5);
+        }
+        [data-theme="dark"] {
+            --bg: #1b1f23;
+            --card-bg: #283339;
+            --text-primary: #e7e9ea;
+            --text-secondary: #8b9197;
+            --input-border: #546474;
+            --input-border-focus: #70b5f9;
+            --input-bg: #1e2a32;
+            --btn-primary: #70b5f9;
+            --btn-primary-hover: #9ecfff;
+            --btn-primary-text: #1b1f23;
+            --link-color: #70b5f9;
+            --card-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            --divider: #38434f;
+            --alert-error-bg: #3d1f1f;
+            --alert-error-color: #ff6b6b;
+            --alert-error-border: #5c2a2a;
+            --alert-success-bg: #1a3a2a;
+            --alert-success-color: #5cc97e;
+            --alert-success-border: #2a5c3a;
+            --todo-item-bg: #1e2a32;
+            --todo-item-border: #38434f;
+            --todo-item-hover: #253340;
+            --tab-active-bg: #70b5f9;
+            --tab-border: #70b5f9;
+            --logout-bg: #3d1f1f;
+            --logout-color: #ff6b6b;
+            --logout-border: #5c2a2a;
+        }
 
-        ul { list-style: none; padding: 0; margin: 0; }
-        li { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        li.completed span { text-decoration: line-through; color: #aaa; }
-        .todo-left { display: flex; align-items: center; gap: 10px; }
-        .todo-checkbox { width: 16px; height: 16px; cursor: pointer; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        .hidden { display: none !important; }
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .btn-logout { background-color: #aaa; font-size: 11px; padding: 5px 10px; }
-        .switch-link { text-align: center; font-size: 13px; color: #666; margin-top: 15px; cursor: pointer; text-decoration: underline; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 16px;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* ✅ 핵심 수정: section이 flex 자식으로 너비를 올바르게 차지하도록 */
+        .section {
+            display: none;
+            width: 100%;
+            max-width: 500px; /* ✅ 전체 섹션 최대 너비 통일 */
+            flex-direction: column;
+            align-items: center;
+        }
+        .section.active {
+            display: flex; /* ✅ block → flex로 변경 */
+        }
+
+        /* 다크모드 토글 */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--card-bg);
+            box-shadow: var(--card-shadow);
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 999;
+        }
+        .theme-toggle:hover { transform: scale(1.1); }
+
+        /* 로고 */
+        .logo-wrap {
+            margin-bottom: 20px;
+            text-align: left;
+            width: 100%; /* ✅ 카드와 동일 너비 */
+        }
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .logo-text {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -1px;
+        }
+        .logo-badge {
+            background: var(--btn-primary);
+            color: var(--btn-primary-text);
+            font-size: 18px;
+            font-weight: 800;
+            padding: 2px 8px 4px;
+            border-radius: 4px;
+        }
+
+        /* 카드 */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 36px 36px 32px; /* ✅ 넉넉한 패딩 */
+            width: 100%; /* ✅ 반드시 100% */
+            box-shadow: var(--card-shadow);
+            transition: background 0.3s, box-shadow 0.3s;
+            animation: fadeIn 0.35s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+        .card-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        /* 알림 */
+        .alert {
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 14px;
+            display: none;
+            border: 1px solid;
+        }
+        .alert-error {
+            background: var(--alert-error-bg);
+            color: var(--alert-error-color);
+            border-color: var(--alert-error-border);
+        }
+        .alert-success {
+            background: var(--alert-success-bg);
+            color: var(--alert-success-color);
+            border-color: var(--alert-success-border);
+        }
+
+        /* 입력 필드 */
+        .input-wrap {
+            position: relative;
+            margin-bottom: 14px;
+            width: 100%; /* ✅ 명시적 100% */
+        }
+        .input-wrap input {
+            width: 100%;
+            padding: 15px 18px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 16px;
+            color: var(--text-primary);
+            background: var(--input-bg);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.3s;
+            -webkit-appearance: none;
+            appearance: none;
+            display: block; /* ✅ inline 요소 방지 */
+        }
+        .input-wrap input::placeholder { color: var(--text-secondary); }
+        .input-wrap input:focus {
+            border-color: var(--input-border-focus);
+            box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.12);
+        }
+
+        /* 비밀번호 표시 */
+        .pw-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--link-color);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px;
+        }
+        .pw-toggle:hover { text-decoration: underline; }
+
+        /* 이메일 + 인증요청 */
+        .email-row {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+            margin-bottom: 14px;
+            width: 100%; /* ✅ 명시적 100% */
+        }
+        .email-row .input-wrap {
+            flex: 1;
+            margin-bottom: 0;
+            min-width: 0; /* ✅ flex 자식 overflow 방지 */
+        }
+        .btn-verify {
+            flex-shrink: 0;
+            padding: 0 18px;
+            background: var(--card-bg);
+            color: var(--link-color);
+            border: 1px solid var(--link-color);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .btn-verify:hover:not(:disabled) { background: var(--todo-item-hover); }
+        .btn-verify:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 링크 */
+        .link-blue {
+            color: var(--link-color);
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+        .link-blue:hover { text-decoration: underline; }
+
+        /* 메인 버튼 */
+        .btn-main {
+            width: 100%;
+            padding: 15px;
+            background: var(--btn-primary);
+            color: var(--btn-primary-text);
+            border: none;
+            border-radius: 30px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+            display: block; /* ✅ block으로 명시 */
+        }
+        .btn-main:hover:not(:disabled) { background: var(--btn-primary-hover); }
+        .btn-main:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* 카드 아래 텍스트 */
+        .below-card {
+            margin-top: 20px;
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-align: center;
+            width: 100%;
+        }
+        .below-card a {
+            color: var(--link-color);
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .below-card a:hover { text-decoration: underline; }
+
+        /* 투두 섹션 */
+        #section-todo {
+            max-width: 580px; /* 투두는 좀 더 넓게 */
+        }
+
+        .todo-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 28px 32px;
+            width: 100%;
+            box-shadow: var(--card-shadow);
+            transition: background 0.3s;
+            animation: fadeIn 0.35s ease;
+        }
+        .todo-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+        }
+        .todo-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .todo-logo-badge {
+            background: var(--btn-primary);
+            color: var(--btn-primary-text);
+            font-size: 13px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        .todo-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .btn-logout {
+            padding: 7px 16px;
+            background: var(--logout-bg);
+            color: var(--logout-color);
+            border: 1px solid var(--logout-border);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn-logout:hover { opacity: 0.8; }
+
+        /* 투두 입력 */
+        .todo-input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+        .todo-input-row input {
+            flex: 1;
+            min-width: 0; /* ✅ overflow 방지 */
+            padding: 13px 16px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 15px;
+            color: var(--text-primary);
+            background: var(--input-bg);
+            outline: none;
+            transition: all 0.2s;
+            -webkit-appearance: none;
+        }
+        .todo-input-row input::placeholder { color: var(--text-secondary); }
+        .todo-input-row input:focus {
+            border-color: var(--input-border-focus);
+            box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.12);
+        }
+        .btn-add {
+            flex-shrink: 0;
+            padding: 13px 22px;
+            background: var(--btn-primary);
+            color: var(--btn-primary-text);
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .btn-add:hover:not(:disabled) { background: var(--btn-primary-hover); }
+        .btn-add:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* 필터 탭 */
+        .filter-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+        .tab-btn {
+            padding: 6px 18px;
+            border: 1px solid var(--tab-border);
+            border-radius: 20px;
+            background: transparent;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--link-color);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--tab-active-bg);
+            color: var(--btn-primary-text);
+        }
+        .tab-btn:hover:not(.active) { background: var(--todo-item-hover); }
+
+        /* 투두 리스트 */
+        .todo-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+        .todo-list::-webkit-scrollbar { width: 4px; }
+        .todo-list::-webkit-scrollbar-track { background: transparent; }
+        .todo-list::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 4px; }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 15px;
+            background: var(--todo-item-bg);
+            border-radius: 8px;
+            border: 1px solid var(--todo-item-border);
+            transition: all 0.2s;
+            animation: slideIn 0.25s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        .todo-item:hover { background: var(--todo-item-hover); border-color: var(--input-border-focus); }
+        .todo-item.completed { opacity: 0.7; }
+
+        .todo-checkbox {
+            width: 20px; height: 20px; min-width: 20px;
+            border: 2px solid var(--input-border);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+            background: var(--input-bg);
+        }
+        .todo-checkbox.checked { background: var(--btn-primary); border-color: var(--btn-primary); }
+        .todo-checkbox.checked::after { content: "✓"; color: white; font-size: 12px; font-weight: 700; }
+
+        .todo-text { flex: 1; font-size: 14px; color: var(--text-primary); min-width: 0; word-break: break-all; }
+        .todo-item.completed .todo-text { text-decoration: line-through; color: var(--text-secondary); }
+
+        .btn-delete {
+            flex-shrink: 0;
+            padding: 4px 10px;
+            background: none;
+            border: 1px solid var(--todo-item-border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-delete:hover { border-color: var(--logout-border); color: var(--logout-color); background: var(--logout-bg); }
+
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+        .empty-state .emoji { font-size: 44px; margin-bottom: 10px; }
+        .empty-state p { font-size: 14px; }
+
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid var(--spinner-color);
+            border-top-color: white; border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== 모바일 반응형 ===== */
+        @media (max-width: 540px) {
+            body {
+                padding: 16px 12px;
+                justify-content: flex-start;
+                padding-top: 64px;
+            }
+
+            .section, #section-todo {
+                max-width: 100%; /* ✅ 모바일에서 꽉 채우기 */
+            }
+
+            .card {
+                padding: 28px 20px 24px;
+                border-radius: 12px;
+            }
+
+            .todo-container {
+                padding: 22px 16px;
+                border-radius: 12px;
+            }
+
+            .card-title { font-size: 24px; }
+
+            /* 이메일 행 → 세로 쌓기 */
+            .email-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+            .btn-verify {
+                width: 100%;
+                padding: 13px;
+                text-align: center;
+            }
+
+            /* 투두 입력 → 세로 쌓기 */
+            .todo-input-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+            .btn-add {
+                width: 100%;
+                padding: 13px;
+            }
+
+            .theme-toggle {
+                top: 12px; right: 12px;
+                width: 40px; height: 40px;
+                font-size: 18px;
+            }
+
+            .todo-title { font-size: 17px; }
+        }
     </style>
 </head>
 <body>
 
-<div id="loginSection" class="container">
-    <h2>🔑 로그인</h2>
-    <div class="auth-group">
-        <input type="text" id="loginId" placeholder="아이디 입력" autocomplete="username">
-        <input type="password" id="loginPw" placeholder="비밀번호 입력" autocomplete="current-password">
-        <button class="btn btn-primary" onclick="handleLogin()">로그인</button>
-    </div>
-    <div class="switch-link" onclick="showRegisterSection()">아직 계정이 없으신가요? 회원가입 하러가기</div>
-    <div class="switch-link" style="color: #e91e63; margin-top: 8px;" onclick="showResetSection()">비밀번호를 잃어버리셨나요?</div>
-</div>
+<button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</button>
 
-<div id="registerSection" class="container hidden">
-    <h2>📝 회원가입</h2>
-    <div class="auth-group">
-        <input type="text" id="regId" placeholder="원하는 아이디 입력" autocomplete="off">
-        <input type="password" id="regPw" placeholder="비밀번호 입력" autocomplete="new-password">
-        <input type="password" id="regPwConfirm" placeholder="비밀번호 재입력 확인" autocomplete="new-password">
-        
-        <div class="row-group">
-            <input type="email" id="regEmail" placeholder="이메일 입력 (인증용)" autocomplete="email">
-            <button class="btn btn-info" onclick="handleRequestCode(event)">인증 요청</button>
+<!-- 로그인 -->
+<div id="section-login" class="section active">
+    <div class="logo-wrap">
+        <div class="logo">
+            <span class="logo-text">Todo</span>
+            <span class="logo-badge">✓</span>
         </div>
-        
-        <input type="text" id="regCode" placeholder="이메일로 받은 인증번호 6자리" autocomplete="one-time-code">
-        <button class="btn btn-secondary" onclick="handleRegister()">인증 및 가입 완료</button>
     </div>
-    <div class="switch-link" onclick="showLoginSection()">이미 계정이 있나요? 로그인 하러가기</div>
-</div>
-
-<div id="resetSection" class="container hidden">
-    <h2>🔒 비밀번호 재설정</h2>
-    <div class="auth-group">
-        <p style="font-size: 12px; color: #666; margin: 0 0 5px 0; text-align: center;">가입할 때 사용한 이메일로 인증을 진행해 주세요.</p>
-        
-        <div class="row-group">
-            <input type="email" id="resetEmail" placeholder="가입했던 이메일 입력" autocomplete="email">
-            <button class="btn btn-info" onclick="handleRequestResetCode(event)">인증 요청</button>
+    <div class="card">
+        <div class="card-title">로그인하세요</div>
+        <div class="card-subtitle">할 일 목록으로 하루를 관리해보세요</div>
+        <div id="login-alert" class="alert alert-error"></div>
+        <div class="input-wrap">
+            <input type="text" id="login-username" placeholder="아이디">
         </div>
-        
-        <input type="text" id="resetCode" placeholder="이메일로 받은 인증번호 6자리" autocomplete="one-time-code">
-        <input type="password" id="resetNewPw" placeholder="새로운 비밀번호 입력" autocomplete="new-password">
-        <input type="password" id="resetNewPwConfirm" placeholder="새로운 비밀번호 확인" autocomplete="new-password">
-        
-        <button class="btn btn-danger" onclick="handleResetPassword()">비밀번호 변경 완료</button>
+        <div class="input-wrap">
+            <input type="password" id="login-password" placeholder="비밀번호">
+            <button class="pw-toggle" onclick="togglePw('login-password', this)">표시</button>
+        </div>
+        <a class="link-blue" onclick="showSection('section-reset')">비밀번호를 잊으셨나요?</a>
+        <button class="btn-main" id="btn-login" onclick="login()">로그인</button>
     </div>
-    <div class="switch-link" onclick="showLoginSection()">로그인 화면으로 돌아가기</div>
+    <div class="below-card">
+        아직 계정이 없으신가요? &nbsp;<a onclick="showSection('section-signup')">회원 가입</a>
+    </div>
 </div>
 
-<div id="todoSection" class="container hidden">
-    <div class="header-box">
-        <h2>📝 나의 투두리스트</h2>
-        <button class="btn btn-logout" onclick="handleLogout()">로그아웃</button>
+<!-- 회원가입 -->
+<div id="section-signup" class="section">
+    <div class="logo-wrap">
+        <div class="logo">
+            <span class="logo-text">Todo</span>
+            <span class="logo-badge">✓</span>
+        </div>
     </div>
-    
-    <div class="input-group">
-        <input type="text" id="todoInput" placeholder="새로운 할 일을 입력하세요..." style="flex: 1; border-radius: 4px 0 0 4px;">
-        <button class="btn btn-primary" onclick="addTodo()" style="border-radius: 0 4px 4px 0;">등록</button>
+    <div class="card">
+        <div class="card-title">회원가입</div>
+        <div class="card-subtitle">지금 가입하고 투두리스트를 시작하세요</div>
+        <div id="signup-alert" class="alert alert-error"></div>
+        <div id="signup-success" class="alert alert-success"></div>
+        <div class="input-wrap">
+            <input type="text" id="signup-username" placeholder="아이디">
+        </div>
+        <div class="input-wrap">
+            <input type="password" id="signup-password" placeholder="비밀번호">
+            <button class="pw-toggle" onclick="togglePw('signup-password', this)">표시</button>
+        </div>
+        <div class="email-row">
+            <div class="input-wrap">
+                <input type="email" id="signup-email" placeholder="이메일">
+            </div>
+            <button class="btn-verify" id="btn-request-code" onclick="requestSignupCode()">인증 요청</button>
+        </div>
+        <div class="input-wrap">
+            <input type="text" id="signup-code" placeholder="6자리 인증번호" maxlength="6">
+        </div>
+        <button class="btn-main" id="btn-signup" onclick="signup()">인증 및 가입 완료</button>
     </div>
+    <div class="below-card">
+        이미 계정이 있나요? &nbsp;<a onclick="showSection('section-login')">로그인 하러가기</a>
+    </div>
+</div>
 
-    <div class="tab-group">
-        <button id="tab-all" class="tab-btn active" onclick="changeTab('all')">전체</button>
-        <button id="tab-active" class="tab-btn" onclick="changeTab('active')">할 일</button>
-        <button id="tab-completed" class="tab-btn" onclick="changeTab('completed')">완료</button>
+<!-- 비밀번호 재설정 -->
+<div id="section-reset" class="section">
+    <div class="logo-wrap">
+        <div class="logo">
+            <span class="logo-text">Todo</span>
+            <span class="logo-badge">✓</span>
+        </div>
     </div>
-    
-    <ul id="todoList"></ul>
+    <div class="card">
+        <div class="card-title">비밀번호 재설정</div>
+        <div class="card-subtitle">가입할 때 사용한 이메일로 인증을 진행해 주세요</div>
+        <div id="reset-alert" class="alert alert-error"></div>
+        <div id="reset-success" class="alert alert-success"></div>
+        <div class="email-row">
+            <div class="input-wrap">
+                <input type="email" id="reset-email" placeholder="가입한 이메일">
+            </div>
+            <button class="btn-verify" id="btn-request-reset-code" onclick="requestResetCode()">인증 요청</button>
+        </div>
+        <div class="input-wrap">
+            <input type="text" id="reset-code" placeholder="6자리 인증번호" maxlength="6">
+        </div>
+        <div class="input-wrap">
+            <input type="password" id="reset-new-password" placeholder="새 비밀번호">
+            <button class="pw-toggle" onclick="togglePw('reset-new-password', this)">표시</button>
+        </div>
+        <button class="btn-main" id="btn-reset" onclick="resetPassword()">비밀번호 변경</button>
+    </div>
+    <div class="below-card">
+        <a onclick="showSection('section-login')">← 로그인으로 돌아가기</a>
+    </div>
+</div>
+
+<!-- 투두리스트 -->
+<div id="section-todo" class="section">
+    <div class="todo-container">
+        <div class="todo-header">
+            <div class="todo-header-left">
+                <span class="todo-logo-badge">✓</span>
+                <span class="todo-title">나의 투두리스트</span>
+            </div>
+            <button class="btn-logout" onclick="logout()">로그아웃</button>
+        </div>
+        <div class="todo-input-row">
+            <input type="text" id="todo-input" placeholder="할 일을 입력하세요...">
+            <button class="btn-add" id="btn-add-todo" onclick="addTodo()">+ 등록</button>
+        </div>
+        <div class="filter-tabs">
+            <button class="tab-btn active" onclick="filterTodos('all', this)">전체</button>
+            <button class="tab-btn" onclick="filterTodos('active', this)">할 일</button>
+            <button class="tab-btn" onclick="filterTodos('completed', this)">완료</button>
+        </div>
+        <ul class="todo-list" id="todo-list"></ul>
+    </div>
 </div>
 
 <script>
-    const BACKEND_URL = "https://todolist-ezpr.onrender.com";
-    let currentTab = 'all'; // 'all', 'active', 'completed'
-    let todoListData = [];  // 백엔드에서 받아온 투두 배열 임시 저장 공간
+    const API_BASE = "https://todolist-ezpr.onrender.com";
+    let currentFilter = 'all';
+    let todos = [];
 
-    window.onload = function() {
-        const token = localStorage.getItem("token");
-        if (token) { showTodoSection(); loadTodos(); } else { showLoginSection(); }
-    };
-
-    function clearAllInputs() {
-        document.getElementById("loginId").value = ""; document.getElementById("loginPw").value = "";
-        document.getElementById("regId").value = ""; document.getElementById("regPw").value = "";
-        document.getElementById("regPwConfirm").value = ""; document.getElementById("regEmail").value = "";
-        document.getElementById("regCode").value = ""; document.getElementById("resetEmail").value = "";
-        document.getElementById("resetCode").value = ""; document.getElementById("resetNewPw").value = "";
-        document.getElementById("resetNewPwConfirm").value = "";
+    // 다크모드
+    function toggleTheme() {
+        const html = document.documentElement;
+        const isDark = html.getAttribute('data-theme') === 'dark';
+        html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+        localStorage.setItem('theme', isDark ? 'light' : 'dark');
     }
-
-    function showLoginSection() { clearAllInputs(); document.getElementById("loginSection").classList.remove("hidden"); document.getElementById("registerSection").classList.add("hidden"); document.getElementById("resetSection").classList.add("hidden"); document.getElementById("todoSection").classList.add("hidden"); }
-    function showRegisterSection() { clearAllInputs(); document.getElementById("loginSection").classList.add("hidden"); document.getElementById("registerSection").classList.remove("hidden"); document.getElementById("resetSection").classList.add("hidden"); document.getElementById("todoSection").classList.add("hidden"); }
-    function showResetSection() { clearAllInputs(); document.getElementById("loginSection").classList.add("hidden"); document.getElementById("registerSection").classList.add("hidden"); document.getElementById("resetSection").classList.remove("hidden"); document.getElementById("todoSection").classList.add("hidden"); }
-    function showTodoSection() { clearAllInputs(); document.getElementById("loginSection").classList.add("hidden"); document.getElementById("registerSection").classList.add("hidden"); document.getElementById("resetSection").classList.add("hidden"); document.getElementById("todoSection").classList.remove("hidden"); }
-
-    function getAuthHeader() { return { "Authorization": `Bearer ${localStorage.getItem("token")}` }; }
-
-    // 탭 변경 로직
-    function changeTab(tabName) {
-        currentTab = tabName;
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`tab-${tabName}`).classList.add('active');
-        renderTodos();
-    }
-
-    // 데이터 기반 화면 렌더링 (탭별로 필터링해서 보여줌)
-    function renderTodos() {
-        const list = document.getElementById("todoList");
-        list.innerHTML = "";
-
-        todoListData.forEach(todo => {
-            if (currentTab === 'active' && todo.completed) return;
-            if (currentTab === 'completed' && !todo.completed) return;
-
-            const li = document.createElement("li");
-            li.id = `todo-${todo.id}`;
-            if (todo.completed) li.classList.add("completed");
-
-            li.innerHTML = `
-                <div class="todo-left">
-                    <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''} onclick="toggleTodo(${todo.id})">
-                    <span>${todo.content}</span>
-                </div>
-                <button class="btn btn-danger" onclick="deleteTodo(${todo.id})">X</button>
-            `;
-            list.appendChild(li);
+    (function() {
+        const saved = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('theme-btn').textContent = saved === 'dark' ? '☀️' : '🌙';
         });
+    })();
+
+    function togglePw(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') { input.type = 'text'; btn.textContent = '숨기기'; }
+        else { input.type = 'password'; btn.textContent = '표시'; }
     }
 
-    // 회원가입 인증 요청
-    async function handleRequestCode(event) {
-        const email = document.getElementById("regEmail").value;
-        if (!email) { alert("이메일을 입력해 주세요."); return; }
-        const targetBtn = event.target; targetBtn.disabled = true; targetBtn.innerText = "보내는 중...";
+    function showSection(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    function showAlert(id, msg, type = 'error') {
+        const el = document.getElementById(id);
+        el.className = `alert alert-${type}`;
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4000);
+    }
+
+    function setLoading(btnId, loading, text) {
+        const btn = document.getElementById(btnId);
+        btn.disabled = loading;
+        btn.innerHTML = loading ? `<span class="spinner"></span> 처리중...` : text;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        ['login-username','login-password'].forEach(id =>
+            document.getElementById(id).addEventListener('keydown', e => e.key==='Enter' && login())
+        );
+        ['signup-username','signup-password','signup-code'].forEach(id =>
+            document.getElementById(id).addEventListener('keydown', e => e.key==='Enter' && signup())
+        );
+        document.getElementById('signup-email').addEventListener('keydown', e => e.key==='Enter' && requestSignupCode());
+        ['reset-code','reset-new-password'].forEach(id =>
+            document.getElementById(id).addEventListener('keydown', e => e.key==='Enter' && resetPassword())
+        );
+        document.getElementById('reset-email').addEventListener('keydown', e => e.key==='Enter' && requestResetCode());
+        document.getElementById('todo-input').addEventListener('keydown', e => e.key==='Enter' && addTodo());
+    });
+
+    async function login() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value.trim();
+        if (!username || !password) { showAlert('login-alert', '아이디와 비밀번호를 입력해주세요.'); return; }
+        setLoading('btn-login', true, '로그인');
         try {
-            const response = await fetch(`${BACKEND_URL}/request-code`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-            const data = await response.json();
-            alert(data.message || "인증번호가 발송되었습니다.");
-        } catch (error) { alert("네트워크 통신 중 오류가 발생했습니다."); } finally { targetBtn.disabled = false; targetBtn.innerText = "인증 요청"; }
+            const res = await fetch(`${API_BASE}/login`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            });
+            const data = await res.json();
+            if (!res.ok) { showAlert('login-alert', data.detail || '로그인 실패'); return; }
+            localStorage.setItem('token', data.access_token);
+            showSection('section-todo'); loadTodos();
+        } catch { showAlert('login-alert', '서버 오류가 발생했습니다.'); }
+        finally { setLoading('btn-login', false, '로그인'); }
     }
 
-    // 회원가입 완료
-    async function handleRegister() {
-        const username = document.getElementById("regId").value; const password = document.getElementById("regPw").value;
-        const passwordConfirm = document.getElementById("regPwConfirm").value; const email = document.getElementById("regEmail").value;
-        const code = document.getElementById("regCode").value;
-        if (!username || !password || !passwordConfirm || !email || !code) { alert("모든 필드를 다 입력해 주세요."); return; }
-        if (password !== passwordConfirm) { alert("비밀번호가 일치하지 않습니다."); return; }
-
-        const response = await fetch(`${BACKEND_URL}/signup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password, email, code }) });
-        const data = await response.json();
-        if (response.ok) { alert("회원가입 성공!"); showLoginSection(); } else { alert("실패: " + data.detail); }
-    }
-
-    // 비밀번호 재설정 인증 요청
-    async function handleRequestResetCode(event) {
-        const email = document.getElementById("resetEmail").value;
-        if (!email) { alert("이메일을 입력해 주세요."); return; }
-        const targetBtn = event.target; targetBtn.disabled = true; targetBtn.innerText = "보내는 중...";
+    async function requestSignupCode() {
+        const email = document.getElementById('signup-email').value.trim();
+        if (!email) { showAlert('signup-alert', '이메일을 입력해주세요.'); return; }
+        const btn = document.getElementById('btn-request-code');
+        btn.disabled = true; btn.textContent = '발송중...';
         try {
-            const response = await fetch(`${BACKEND_URL}/request-reset-code`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-            const data = await response.json();
-            alert(data.message || "인증번호가 발송되었습니다.");
-        } catch (error) { alert("네트워크 통신 중 오류가 발생했습니다."); } finally { targetBtn.disabled = false; targetBtn.innerText = "인증 요청"; }
+            const res = await fetch(`${API_BASE}/request-code`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email})
+            });
+            const data = await res.json();
+            if (!res.ok) { showAlert('signup-alert', data.detail || '요청 실패'); btn.disabled = false; btn.textContent = '인증 요청'; return; }
+            showAlert('signup-success', '인증번호가 발송되었습니다!', 'success');
+            startCooldown(btn, 180);
+        } catch { showAlert('signup-alert', '서버 오류'); btn.disabled = false; btn.textContent = '인증 요청'; }
     }
 
-    // 비밀번호 변경 완료
-    async function handleResetPassword() {
-        const email = document.getElementById("resetEmail").value; const code = document.getElementById("resetCode").value;
-        const new_password = document.getElementById("resetNewPw").value; const new_password_confirm = document.getElementById("resetNewPwConfirm").value;
-        if (!email || !code || !new_password || !new_password_confirm) { alert("모든 필드를 다 입력해 주세요."); return; }
-        if (new_password !== new_password_confirm) { alert("비밀번호가 일치하지 않습니다."); return; }
-
-        const response = await fetch(`${BACKEND_URL}/reset-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code, new_password }) });
-        const data = await response.json();
-        if (response.ok) { alert(data.message || "비밀번호 변경 완료!"); showLoginSection(); } else { alert("실패: " + data.detail); }
+    async function signup() {
+        const username = document.getElementById('signup-username').value.trim();
+        const password = document.getElementById('signup-password').value.trim();
+        const email = document.getElementById('signup-email').value.trim();
+        const code = document.getElementById('signup-code').value.trim();
+        if (!username||!password||!email||!code) { showAlert('signup-alert','모든 항목을 입력해주세요.'); return; }
+        setLoading('btn-signup', true, '인증 및 가입 완료');
+        try {
+            const res = await fetch(`${API_BASE}/signup`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username,password,email,code})
+            });
+            const data = await res.json();
+            if (!res.ok) { showAlert('signup-alert', data.detail||'회원가입 실패'); return; }
+            showAlert('signup-success', '회원가입 성공! 로그인 해주세요.', 'success');
+            setTimeout(() => showSection('section-login'), 1500);
+        } catch { showAlert('signup-alert', '서버 오류가 발생했습니다.'); }
+        finally { setLoading('btn-signup', false, '인증 및 가입 완료'); }
     }
 
-    // 로그인
-    async function handleLogin() {
-        const username = document.getElementById("loginId").value; const password = document.getElementById("loginPw").value;
-        const response = await fetch(`${BACKEND_URL}/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
-        const data = await response.json();
-        if (response.ok) { localStorage.setItem("token", data.access_token); showTodoSection(); loadTodos(); } else { alert("로그인 실패: " + data.detail); }
+    async function requestResetCode() {
+        const email = document.getElementById('reset-email').value.trim();
+        if (!email) { showAlert('reset-alert', '이메일을 입력해주세요.'); return; }
+        const btn = document.getElementById('btn-request-reset-code');
+        btn.disabled = true; btn.textContent = '발송중...';
+        try {
+            const res = await fetch(`${API_BASE}/request-reset-code`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email})
+            });
+            const data = await res.json();
+            if (!res.ok) { showAlert('reset-alert', data.detail||'요청 실패'); btn.disabled = false; btn.textContent = '인증 요청'; return; }
+            showAlert('reset-success', '인증번호가 발송되었습니다!', 'success');
+            startCooldown(btn, 180);
+        } catch { showAlert('reset-alert', '서버 오류'); btn.disabled = false; btn.textContent = '인증 요청'; }
     }
 
-    // 로그아웃
-    function handleLogout() { localStorage.removeItem("token"); todoListData = []; showLoginSection(); }
+    async function resetPassword() {
+        const email = document.getElementById('reset-email').value.trim();
+        const code = document.getElementById('reset-code').value.trim();
+        const new_password = document.getElementById('reset-new-password').value.trim();
+        if (!email||!code||!new_password) { showAlert('reset-alert','모든 항목을 입력해주세요.'); return; }
+        setLoading('btn-reset', true, '비밀번호 변경');
+        try {
+            const res = await fetch(`${API_BASE}/reset-password`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email,code,new_password})
+            });
+            const data = await res.json();
+            if (!res.ok) { showAlert('reset-alert', data.detail||'재설정 실패'); return; }
+            showAlert('reset-success', '비밀번호가 변경되었습니다!', 'success');
+            setTimeout(() => showSection('section-login'), 1500);
+        } catch { showAlert('reset-alert', '서버 오류가 발생했습니다.'); }
+        finally { setLoading('btn-reset', false, '비밀번호 변경'); }
+    }
 
-    // 투두 전체 가져오기
+    function startCooldown(btn, seconds) {
+        let count = seconds;
+        const timer = setInterval(() => {
+            btn.textContent = `재요청 (${count}s)`;
+            count--;
+            if (count < 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '인증 요청'; }
+        }, 1000);
+    }
+
     async function loadTodos() {
-        const response = await fetch(`${BACKEND_URL}/todos`, { headers: getAuthHeader() });
-        if (response.ok) {
-            todoListData = await response.json();
-            renderTodos();
-        }
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE}/todos`, { headers: {'Authorization': `Bearer ${token}`} });
+            if (res.status === 401) { logout(); return; }
+            todos = await res.json(); renderTodos();
+        } catch (e) { console.error(e); }
     }
 
-    // 투두 추가
     async function addTodo() {
-        const input = document.getElementById("todoInput"); if (!input.value) return;
-        const response = await fetch(`${BACKEND_URL}/todos`, { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify({ content: input.value }) });
-        if (response.ok) {
-            const newTodo = await response.json();
-            todoListData.push({ id: newTodo.id, content: newTodo.content, completed: false });
-            input.value = "";
-            renderTodos();
-        }
+        const input = document.getElementById('todo-input');
+        const content = input.value.trim();
+        if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
+        const btn = document.getElementById('btn-add-todo');
+        if (btn.disabled) return;
+        btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE}/todos`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+                body: JSON.stringify({content})
+            });
+            if (res.status === 401) { logout(); return; }
+            const newTodo = await res.json();
+            todos.push({id: newTodo.id, content: newTodo.content, completed: false});
+            input.value = ''; renderTodos();
+        } catch (e) { console.error(e); }
+        finally { btn.disabled = false; btn.innerHTML = '+ 등록'; }
     }
 
-    // 💡 투두 완료 토글 (백엔드 PATCH 라우터 호출 구조)
     async function toggleTodo(id) {
-        const response = await fetch(`${BACKEND_URL}/todos/${id}/toggle`, { method: "PATCH", headers: getAuthHeader() });
-        if (response.ok) {
-            const data = await response.json();
-            // 로컬 데이터 배열 상태 갱신 후 리렌더링
-            const index = todoListData.findIndex(t => t.id === id);
-            if (index !== -1) {
-                todoListData[index].completed = !todoListData[index].completed;
-                renderTodos();
-            }
-        }
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE}/todos/${id}/toggle`, {
+                method: 'PATCH', headers: {'Authorization': `Bearer ${token}`}
+            });
+            if (!res.ok) return;
+            const updated = await res.json();
+            const todo = todos.find(t => t.id === id);
+            if (todo) todo.completed = updated.completed;
+            renderTodos();
+        } catch (e) { console.error(e); }
     }
 
-    // 투두 삭제
     async function deleteTodo(id) {
-        const response = await fetch(`${BACKEND_URL}/todos/${id}`, { method: "DELETE", headers: getAuthHeader() });
-        if (response.ok) {
-            todoListData = todoListData.filter(t => t.id !== id);
-            renderTodos();
-        }
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE}/todos/${id}`, {
+                method: 'DELETE', headers: {'Authorization': `Bearer ${token}`}
+            });
+            if (!res.ok) return;
+            todos = todos.filter(t => t.id !== id); renderTodos();
+        } catch (e) { console.error(e); }
     }
+
+    function filterTodos(filter, btn) {
+        currentFilter = filter;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); renderTodos();
+    }
+
+    function renderTodos() {
+        const list = document.getElementById('todo-list');
+        let filtered = todos;
+        if (currentFilter === 'active') filtered = todos.filter(t => !t.completed);
+        if (currentFilter === 'completed') filtered = todos.filter(t => t.completed);
+        if (filtered.length === 0) {
+            list.innerHTML = `
+                <div class="empty-state">
+                    <div class="emoji">${currentFilter==='completed'?'🎉':'📋'}</div>
+                    <p>${currentFilter==='completed'?'완료된 항목이 없어요!':'할 일을 추가해보세요!'}</p>
+                </div>`;
+            return;
+        }
+        list.innerHTML = filtered.map(t => `
+            <li class="todo-item ${t.completed?'completed':''}">
+                <div class="todo-checkbox ${t.completed?'checked':''}" onclick="toggleTodo(${t.id})"></div>
+                <span class="todo-text">${escapeHtml(t.content)}</span>
+                <button class="btn-delete" onclick="deleteTodo(${t.id})">삭제</button>
+            </li>
+        `).join('');
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function logout() {
+        localStorage.removeItem('token'); todos = []; showSection('section-login');
+    }
+
+    window.onload = () => {
+        const token = localStorage.getItem('token');
+        if (token) { showSection('section-todo'); loadTodos(); }
+    };
 </script>
 </body>
 </html>
