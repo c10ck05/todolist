@@ -49,7 +49,7 @@ def get_current_user_id(authorization: Annotated[str | None, Header()] = None):
 
 def send_email(to: str, subject: str, body: str):
     resend.Emails.send({
-        "from": "onboarding@resend.dev",
+        "from": "admin@hyunjae.co.kr",
         "to": [to],
         "subject": subject,
         "text": body,
