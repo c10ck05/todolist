@@ -24,6 +24,8 @@ class TodoTable(Base):
     todo = Column(Text, nullable=False)
     owner_id = Column(String(50), nullable=False)
     completed = Column(Boolean, default=False, nullable=False)
+    deadline = Column(DateTime, nullable=True)
+    reminder_sent = Column(Boolean, default=False, nullable=False)
 
 class UserTable(Base):
     __tablename__ = "users"
@@ -34,7 +36,6 @@ class UserTable(Base):
 
 class EmailVerificationTable(Base):
     __tablename__ = "email_verifications"
-    
     email = Column(String(100), primary_key=True)
     code = Column(String(6), nullable=False)
     expires_at = Column(DateTime, nullable=False)
