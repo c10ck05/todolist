@@ -183,7 +183,6 @@ async def request_verification_code(email_data: dict, db: Session = Depends(get_
         recipients=[user_email],
         body=f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요.",
         subtype=MessageType.plain,
-        from_email=os.getenv("MAIL_FROM")
     )
     fm = FastMail(conf)
     await fm.send_message(message)
@@ -239,7 +238,6 @@ async def request_code(email_data: dict, db: Session = Depends(get_db)):
         recipients=[user_email],
         body=f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요.",
         subtype=MessageType.plain,
-        from_email="admin@hyunjae.co.kr"  # 👈 여기도 똑같이 명시!
     )
     fm = FastMail(conf)
     await fm.send_message(message)
