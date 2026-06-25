@@ -3,30 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import Annotated
 import bcrypt
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 import random
 import os
 from dotenv import load_dotenv
 from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable, engine, Base
 from datetime import datetime, timedelta
 import jwt
+# 기존 fastapi_mail 관련 코드 전부 삭제
+# ↓ 이걸로 교체
+import resend
 
+resend.api_key = os.getenv("RESEND_API_KEY")
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
 load_dotenv()
 
-conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
-    MAIL_FROM=os.getenv("MAIL_FROM"),
-    MAIL_SERVER="smtp.gmail.com",
-    MAIL_PORT=587,
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
-)
-email_verification_store = {}
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -167,25 +158,22 @@ async def request_verification_code(email_data: dict, db: Session = Depends(get_
     user_email = email_data.get("email")
     if not user_email:
         raise HTTPException(status_code=400, detail="이메일을 입력해주세요.")
-        
+    
     code = str(random.randint(100000, 999999))
-    
     expire_time = datetime.now() + timedelta(minutes=3)
-
-    db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user_email).delete()
     
+    db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user_email).delete()
     new_verification = EmailVerificationTable(email=user_email, code=code, expires_at=expire_time)
     db.add(new_verification)
     db.commit()
     
-    message = MessageSchema(
-        subject="투두리스트 회원가입 인증번호입니다.",
-        recipients=[user_email],
-        body=f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요.",
-        subtype=MessageType.plain,
-    )
-    fm = FastMail(conf)
-    await fm.send_message(message)
+    # ✅ Resend로 전송
+    resend.Emails.send({
+        "from": "admin@hyunjae.co.kr",
+        "to": [user_email],
+        "subject": "투두리스트 회원가입 인증번호입니다.",
+        "text": f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요."
+    })
     return {"message": "인증번호가 발송되었습니다. 메일함을 확인하세요!"}
 
 @app.post("/reset-password")
@@ -223,22 +211,20 @@ async def request_code(email_data: dict, db: Session = Depends(get_db)):
     user = db.query(UserTable).filter(UserTable.email == user_email).first()
     if not user:
         raise HTTPException(status_code=400, detail="회원가입이 필요합니다.")
-    code = str(random.randint(100000, 999999))
     
+    code = str(random.randint(100000, 999999))
     expire_time = datetime.now() + timedelta(minutes=3)
 
     db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user_email).delete()
-    
     new_verification = EmailVerificationTable(email=user_email, code=code, expires_at=expire_time)
     db.add(new_verification)
     db.commit()
-    
-    message = MessageSchema(
-        subject="투두리스트 비밀번호 재설정 인증번호입니다.",
-        recipients=[user_email],
-        body=f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요.",
-        subtype=MessageType.plain,
-    )
-    fm = FastMail(conf)
-    await fm.send_message(message)
+
+    # ✅ Resend로 교체
+    resend.Emails.send({
+        "from": "admin@hyunjae.co.kr",
+        "to": [user_email],
+        "subject": "투두리스트 비밀번호 재설정 인증번호입니다.",
+        "text": f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요."
+    })
     return {"message": "인증번호가 발송되었습니다. 메일함을 확인하세요!"}
