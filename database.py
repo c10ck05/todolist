@@ -12,7 +12,7 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -24,8 +24,6 @@ class TodoTable(Base):
     todo = Column(Text, nullable=False)
     owner_id = Column(String(50), nullable=False)
     completed = Column(Boolean, default=False, nullable=False)
-    deadline = Column(DateTime, nullable=True)
-    reminder_sent = Column(Boolean, default=False, nullable=False)
 
 class UserTable(Base):
     __tablename__ = "users"

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable, engine, Base
 from datetime import datetime, timedelta
 import jwt
-from apscheduler.schedulers.background import BackgroundScheduler  # ✅ pip install apscheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
