@@ -16,15 +16,15 @@ ALGORITHM = "HS256"
 load_dotenv()
 
 conf = ConnectionConfig(
-    MAIL_USERNAME = os.environ.get("MAIL_USERNAME"),
-    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD"),
-    MAIL_FROM = os.environ.get("MAIL_FROM"),
-    MAIL_SERVER = "smtp.gmail.com",
-    MAIL_FROM_NAME = "Todo App",
-    
-    MAIL_PORT = 465,
-    MAIL_STARTTLS = False,
-    MAIL_SSL_TLS = True
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+    MAIL_FROM=os.getenv("MAIL_FROM"),
+    MAIL_SERVER="smtp.gmail.com",
+    MAIL_PORT=587,
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
 )
 email_verification_store = {}
 
@@ -183,7 +183,7 @@ async def request_verification_code(email_data: dict, db: Session = Depends(get_
         recipients=[user_email],
         body=f"요청하신 인증번호는 [{code}] 입니다. 3분 내에 입력해주세요.",
         subtype=MessageType.plain,
-        from_email="admin@hyunjae.co.kr"  # 👈 여기에 발신 주소 명시!
+        from_email=os.getenv("MAIL_FROM")
     )
     fm = FastMail(conf)
     await fm.send_message(message)
