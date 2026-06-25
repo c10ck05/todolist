@@ -19,8 +19,10 @@ conf = ConnectionConfig(
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME"),
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD"),
     MAIL_FROM = os.environ.get("MAIL_FROM"),
-    MAIL_PORT = int(os.environ.get("MAIL_PORT")),
     MAIL_SERVER = "smtp.gmail.com",
+    MAIL_FROM_NAME = "Todo App",
+    
+    MAIL_PORT = 465,
     MAIL_STARTTLS = False,
     MAIL_SSL_TLS = True
 )
