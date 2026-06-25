@@ -7,7 +7,6 @@ from sqlalchemy.orm import sessionmaker
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -18,6 +17,8 @@ class TodoTable(Base):
     todo = Column(Text, nullable=False)
     owner_id = Column(String(50), nullable=False)
     completed = Column(Boolean, default=False, nullable=False)
+    deadline = Column(DateTime, nullable=True)
+    reminder_sent = Column(Boolean, default=False, nullable=False)
 
 class UserTable(Base):
     __tablename__ = "users"
