@@ -3,8 +3,8 @@ uvicorn==0.30.6
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
 bcrypt==4.2.0
+fastapi-mail==1.4.1
 python-dotenv==1.0.1
 PyJWT==2.9.0
 python-multipart==0.0.12
-resend==2.0.0
 APScheduler==3.10.4
