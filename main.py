@@ -9,7 +9,19 @@ from dotenv import load_dotenv
 from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable, engine, Base
 from datetime import datetime, timedelta, timezone
 import jwt
+
+# main.py에 추가
+import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
+
+def keep_alive():
+    try:
+        httpx.get("https://본인서버주소.onrender.com")
+        print("✅ Keep alive ping 성공")
+    except:
+        pass
+
+scheduler.add_job(keep_alive, 'interval', minutes=10)
 
 load_dotenv()
 
@@ -311,5 +323,6 @@ def check_deadlines():
 
 
 scheduler = BackgroundScheduler(timezone="Asia/Seoul")
-scheduler.add_job(check_deadlines, "interval", minutes=30, id="deadline_checker")
+scheduler.add_job(check_deadlines, 'interval', minutes=30)
+scheduler.add_job(keep_alive, 'interval', minutes=10)
 scheduler.start()
