@@ -4,22 +4,13 @@ from sqlalchemy.orm import Session
 from typing import Annotated
 import bcrypt
 import resend
-import random, os, asyncio
+import random, os
 from dotenv import load_dotenv
 from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable, engine, Base
 from datetime import datetime, timedelta, timezone
 import jwt
-
-# main.py에 추가
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
-
-def keep_alive():
-    try:
-        httpx.get("https://todolist-ezpr.onrender.com")
-        print("✅ Keep alive ping 성공")
-    except:
-        pass
 
 load_dotenv()
 
@@ -46,7 +37,6 @@ app.add_middleware(
 # 이메일 발송 유틸 (Resend)
 # =====================
 def send_email(to: str, subject: str, body: str):
-    """Resend로 이메일 발송"""
     params = {
         "from": MAIL_FROM,
         "to": [to],
@@ -86,15 +76,11 @@ def request_verification_code(email_data: dict, db: Session = Depends(get_db)):
     user_email = email_data.get("email")
     if not user_email:
         raise HTTPException(status_code=400, detail="이메일을 입력해주세요.")
-
     code = str(random.randint(100000, 999999))
     expire_time = datetime.now(KST).replace(tzinfo=None) + timedelta(minutes=3)
-
     db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user_email).delete()
     db.add(EmailVerificationTable(email=user_email, code=code, expires_at=expire_time))
     db.commit()
-
-    # ✅ Resend로 발송
     send_email(
         to=user_email,
         subject="투두리스트 회원가입 인증번호입니다.",
@@ -152,15 +138,11 @@ def request_reset_code(email_data: dict, db: Session = Depends(get_db)):
     user = db.query(UserTable).filter(UserTable.email == user_email).first()
     if not user:
         raise HTTPException(status_code=400, detail="회원가입이 필요합니다.")
-
     code = str(random.randint(100000, 999999))
     expire_time = datetime.now(KST).replace(tzinfo=None) + timedelta(minutes=3)
-
     db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user_email).delete()
     db.add(EmailVerificationTable(email=user_email, code=code, expires_at=expire_time))
     db.commit()
-
-    # ✅ Resend로 발송
     send_email(
         to=user_email,
         subject="투두리스트 비밀번호 재설정 인증번호입니다.",
@@ -174,7 +156,6 @@ def reset_password(reset_data: dict, db: Session = Depends(get_db)):
     user_data = db.query(UserTable).filter(UserTable.email == reset_data.get("email")).first()
     if not user_data:
         raise HTTPException(status_code=400, detail="일치하는 계정이 없습니다.")
-
     verification = db.query(EmailVerificationTable).filter(
         EmailVerificationTable.email == reset_data.get("email")
     ).first()
@@ -186,7 +167,6 @@ def reset_password(reset_data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="인증 시간이 만료되었습니다.")
     if verification.code != reset_data.get("code"):
         raise HTTPException(status_code=400, detail="인증번호가 일치하지 않습니다.")
-
     hashed = bcrypt.hashpw(reset_data.get("new_password").encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     user_data.password = hashed
     db.delete(verification)
@@ -213,15 +193,12 @@ def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session
 def create_todo(todo_data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
     content = todo_data.get("content")
     user_id = get_current_user_id(authorization)
-
     deadline_str = todo_data.get("deadline")
     deadline = datetime.fromisoformat(deadline_str) if deadline_str else None
-
     new_todo = TodoTable(todo=content, owner_id=user_id, deadline=deadline)
     db.add(new_todo)
     db.commit()
     db.refresh(new_todo)
-
     return {
         "id": new_todo.id,
         "content": new_todo.todo,
@@ -263,12 +240,10 @@ def update_deadline(id: int, data: dict, authorization: Annotated[str | None, He
         raise HTTPException(status_code=404, detail="데이터가 없습니다.")
     if todo.owner_id != user_id:
         raise HTTPException(status_code=403, detail="본인 리스트가 아닙니다.")
-
     deadline_str = data.get("deadline")
     todo.deadline = datetime.fromisoformat(deadline_str) if deadline_str else None
     todo.reminder_sent = False
     db.commit()
-
     return {
         "id": todo.id,
         "deadline": todo.deadline.isoformat() if todo.deadline else None
@@ -283,7 +258,6 @@ def check_deadlines():
     try:
         now = datetime.now(KST).replace(tzinfo=None)
         deadline_24h = now + timedelta(hours=24)
-
         todos = db.query(TodoTable).filter(
             TodoTable.deadline != None,
             TodoTable.deadline > now,
@@ -291,33 +265,31 @@ def check_deadlines():
             TodoTable.completed == False,
             TodoTable.reminder_sent == False
         ).all()
-
         for todo in todos:
             user = db.query(UserTable).filter(UserTable.user_id == todo.owner_id).first()
             if user:
                 deadline_str = todo.deadline.strftime("%Y년 %m월 %d일 %H:%M")
                 try:
-                    # ✅ Resend로 발송
                     send_email(
                         to=user.email,
                         subject="⏰ 투두리스트 마감기한 알림",
-                        body=f"""안녕하세요!
-
-아래 투두의 마감기한이 24시간 이내로 다가왔습니다.
-
-📌 할 일: {todo.todo}
-⏰ 마감기한: {deadline_str}
-
-서비스에 접속하여 완료 처리해 주세요!"""
+                        body=f"안녕하세요!\n\n아래 투두의 마감기한이 24시간 이내로 다가왔습니다.\n\n📌 할 일: {todo.todo}\n⏰ 마감기한: {deadline_str}\n\n서비스에 접속하여 완료 처리해 주세요!"
                     )
                     todo.reminder_sent = True
                     print(f"✅ 리마인더 발송: {user.email} - {todo.todo}")
                 except Exception as e:
                     print(f"❌ 이메일 발송 실패: {e}")
-
         db.commit()
     finally:
         db.close()
+
+
+def keep_alive():
+    try:
+        httpx.get("https://본인서버주소.onrender.com")
+        print("✅ Keep alive ping 성공")
+    except:
+        pass
 
 
 scheduler = BackgroundScheduler(timezone="Asia/Seoul")

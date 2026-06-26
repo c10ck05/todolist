@@ -34,14 +34,12 @@
             --logout-color: #cc1016;
             --logout-border: #ffd0d0;
             --spinner-color: rgba(255,255,255,0.5);
-            /* ✅ 마감기한 관련 색상 */
             --overdue-bg: #fff4e5;
             --overdue-border: #f59e0b;
             --overdue-text: #92400e;
             --deadline-chip-bg: #e0f2fe;
             --deadline-chip-color: #0369a1;
             --deadline-picker-bg: #f0f7ff;
-            /* ✅ 타임라인 색상 */
             --timeline-line: #cbd5e1;
             --timeline-dot: #0a66c2;
             --timeline-dot-overdue: #ef4444;
@@ -88,9 +86,7 @@
             --timeline-dot-today: #fbbf24;
             --timeline-dot-done: #34d399;
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
@@ -103,7 +99,6 @@
             padding: 20px 16px;
             transition: background 0.3s, color 0.3s;
         }
-
         .section {
             display: none;
             width: 100%;
@@ -113,7 +108,6 @@
         }
         .section.active { display: flex; }
         #section-todo { max-width: 620px; }
-
         .theme-toggle {
             position: fixed;
             top: 20px; right: 20px;
@@ -126,12 +120,10 @@
             transition: all 0.3s; z-index: 999;
         }
         .theme-toggle:hover { transform: scale(1.1); }
-
         .logo-wrap { margin-bottom: 20px; text-align: left; width: 100%; }
         .logo { display: inline-flex; align-items: center; gap: 4px; }
         .logo-text { font-size: 32px; font-weight: 800; color: var(--text-primary); letter-spacing: -1px; }
         .logo-badge { background: var(--btn-primary); color: var(--btn-primary-text); font-size: 18px; font-weight: 800; padding: 2px 8px 4px; border-radius: 4px; }
-
         .card {
             background: var(--card-bg);
             border-radius: 12px;
@@ -142,14 +134,11 @@
             animation: fadeIn 0.35s ease;
         }
         @keyframes fadeIn { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
-
         .card-title { font-size: 28px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; letter-spacing: -0.5px; }
         .card-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; }
-
         .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 14px; display: none; border: 1px solid; }
         .alert-error { background: var(--alert-error-bg); color: var(--alert-error-color); border-color: var(--alert-error-border); }
         .alert-success { background: var(--alert-success-bg); color: var(--alert-success-color); border-color: var(--alert-success-border); }
-
         .input-wrap { position: relative; margin-bottom: 14px; width: 100%; }
         .input-wrap input {
             width: 100%; padding: 15px 18px;
@@ -160,27 +149,21 @@
         }
         .input-wrap input::placeholder { color: var(--text-secondary); }
         .input-wrap input:focus { border-color: var(--input-border-focus); box-shadow: 0 0 0 3px rgba(10,102,194,0.12); }
-
         .pw-toggle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--link-color); font-size: 14px; font-weight: 600; cursor: pointer; padding: 4px; }
         .pw-toggle:hover { text-decoration: underline; }
-
         .email-row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 14px; width: 100%; }
         .email-row .input-wrap { flex: 1; margin-bottom: 0; min-width: 0; }
         .btn-verify { flex-shrink: 0; padding: 0 18px; background: var(--card-bg); color: var(--link-color); border: 1px solid var(--link-color); border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
         .btn-verify:hover:not(:disabled) { background: var(--todo-item-hover); }
         .btn-verify:disabled { opacity: 0.5; cursor: not-allowed; }
-
         .link-blue { color: var(--link-color); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; display: inline-block; margin-bottom: 16px; }
         .link-blue:hover { text-decoration: underline; }
-
         .btn-main { width: 100%; padding: 15px; background: var(--btn-primary); color: var(--btn-primary-text); border: none; border-radius: 30px; font-size: 17px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 8px; -webkit-appearance: none; display: block; }
         .btn-main:hover:not(:disabled) { background: var(--btn-primary-hover); }
         .btn-main:disabled { opacity: 0.6; cursor: not-allowed; }
-
         .below-card { margin-top: 20px; font-size: 15px; color: var(--text-secondary); text-align: center; width: 100%; }
         .below-card a { color: var(--link-color); font-weight: 700; text-decoration: none; cursor: pointer; }
         .below-card a:hover { text-decoration: underline; }
-
         /* ========== 투두 컨테이너 ========== */
         .todo-container {
             background: var(--card-bg);
@@ -197,7 +180,6 @@
         .todo-title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
         .btn-logout { padding: 7px 16px; background: var(--logout-bg); color: var(--logout-color); border: 1px solid var(--logout-border); border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .btn-logout:hover { opacity: 0.8; }
-
         .todo-input-row { display: flex; gap: 10px; margin-bottom: 16px; width: 100%; }
         .todo-input-row input { flex: 1; min-width: 0; padding: 13px 16px; border: 1px solid var(--input-border); border-radius: 8px; font-size: 15px; color: var(--text-primary); background: var(--input-bg); outline: none; transition: all 0.2s; -webkit-appearance: none; }
         .todo-input-row input::placeholder { color: var(--text-secondary); }
@@ -205,18 +187,15 @@
         .btn-add { flex-shrink: 0; padding: 13px 22px; background: var(--btn-primary); color: var(--btn-primary-text); border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
         .btn-add:hover:not(:disabled) { background: var(--btn-primary-hover); }
         .btn-add:disabled { opacity: 0.6; cursor: not-allowed; }
-
         /* 필터 탭 */
         .filter-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
         .tab-btn { padding: 6px 18px; border: 1px solid var(--tab-border); border-radius: 20px; background: transparent; font-size: 13px; font-weight: 600; color: var(--link-color); cursor: pointer; transition: all 0.2s; }
         .tab-btn.active { background: var(--tab-active-bg); color: var(--btn-primary-text); }
         .tab-btn:hover:not(.active) { background: var(--todo-item-hover); }
-
         /* 투두 리스트 */
         .todo-list { list-style: none; display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto; padding-right: 2px; }
         .todo-list::-webkit-scrollbar { width: 4px; }
         .todo-list::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 4px; }
-
         .todo-item {
             background: var(--todo-item-bg);
             border-radius: 10px;
@@ -227,27 +206,21 @@
         }
         @keyframes slideIn { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
         .todo-item:hover { background: var(--todo-item-hover); border-color: var(--input-border-focus); }
-
-        /* ✅ 마감기한 지난 투두 스타일 */
         .todo-item.overdue {
             background: var(--overdue-bg) !important;
             border-color: var(--overdue-border) !important;
         }
         .todo-item.overdue:hover { filter: brightness(0.97); }
-
         .todo-item-main { display: flex; align-items: center; gap: 12px; padding: 13px 15px; }
         .todo-item.completed { opacity: 0.65; }
-
         .todo-checkbox { width: 20px; height: 20px; min-width: 20px; border: 2px solid var(--input-border); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; background: var(--input-bg); }
         .todo-checkbox.checked { background: var(--btn-primary); border-color: var(--btn-primary); }
         .todo-checkbox.checked::after { content: "✓"; color: white; font-size: 12px; font-weight: 700; }
-
         .todo-content { flex: 1; min-width: 0; }
         .todo-text { font-size: 14px; color: var(--text-primary); word-break: break-word; }
         .todo-item.completed .todo-text { text-decoration: line-through; color: var(--text-secondary); }
         .todo-item.overdue .todo-text { color: var(--overdue-text); }
-
-        /* ✅ 마감기한 칩 */
+        /* 마감기한 칩 */
         .deadline-chip {
             display: inline-flex; align-items: center; gap: 4px;
             margin-top: 4px;
@@ -261,10 +234,7 @@
             color: var(--overdue-text);
             border: 1px solid var(--overdue-border);
         }
-
         .todo-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-
-        /* ✅ 마감기한 버튼 */
         .btn-deadline {
             padding: 4px 8px; background: none;
             border: 1px solid var(--todo-item-border);
@@ -274,11 +244,9 @@
         }
         .btn-deadline:hover { border-color: var(--input-border-focus); color: var(--link-color); }
         .btn-deadline.active { border-color: var(--input-border-focus); color: var(--link-color); background: var(--deadline-chip-bg); }
-
         .btn-delete { padding: 4px 10px; background: none; border: 1px solid var(--todo-item-border); border-radius: 4px; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all 0.2s; }
         .btn-delete:hover { border-color: var(--logout-border); color: var(--logout-color); background: var(--logout-bg); }
-
-        /* ✅ 마감기한 picker 패널 */
+        /* 마감기한 picker 패널 */
         .deadline-panel {
             display: none;
             padding: 12px 15px 14px;
@@ -305,22 +273,15 @@
         .btn-deadline-save:hover { background: var(--btn-primary-hover); }
         .btn-deadline-remove { padding: 7px 10px; background: none; border: 1px solid var(--logout-border); color: var(--logout-color); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
         .btn-deadline-remove:hover { background: var(--logout-bg); }
-
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
         .empty-state .emoji { font-size: 44px; margin-bottom: 10px; }
         .empty-state p { font-size: 14px; }
-
-        /* ========================================
-           ✅ 타임라인 뷰
-        ======================================== */
+        /* 타임라인 뷰 */
         #timeline-view { display: none; }
         #timeline-view.active { display: block; }
-
         .timeline-empty { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
         .timeline-empty .emoji { font-size: 44px; margin-bottom: 10px; }
-
         .timeline-group { margin-bottom: 8px; }
-
         .timeline-date-label {
             font-size: 12px; font-weight: 700;
             color: var(--text-secondary);
@@ -331,14 +292,12 @@
         }
         .timeline-date-label.today-label { color: var(--timeline-dot-today); }
         .timeline-date-label.overdue-label { color: var(--timeline-dot-overdue); }
-
         .timeline-item {
             display: flex;
             gap: 0;
             position: relative;
             padding-bottom: 12px;
         }
-        /* 세로선 */
         .timeline-item:not(:last-child) .timeline-line-col::after {
             content: '';
             position: absolute;
@@ -347,7 +306,6 @@
             bottom: 0;
             background: var(--timeline-line);
         }
-
         .timeline-line-col {
             width: 20px; min-width: 20px;
             position: relative;
@@ -355,7 +313,6 @@
             flex-direction: column;
             align-items: center;
         }
-
         .timeline-dot {
             width: 12px; height: 12px;
             border-radius: 50%;
@@ -369,7 +326,6 @@
         .timeline-dot.overdue { background: var(--timeline-dot-overdue); box-shadow: 0 0 0 2px var(--timeline-dot-overdue); }
         .timeline-dot.today { background: var(--timeline-dot-today); box-shadow: 0 0 0 2px var(--timeline-dot-today); }
         .timeline-dot.done { background: var(--timeline-dot-done); box-shadow: 0 0 0 2px var(--timeline-dot-done); }
-
         .timeline-card {
             flex: 1; min-width: 0;
             margin-left: 10px;
@@ -382,19 +338,16 @@
         .timeline-card:hover { background: var(--todo-item-hover); }
         .timeline-card.overdue { background: var(--overdue-bg); border-color: var(--overdue-border); }
         .timeline-card.done { opacity: 0.6; }
-
         .timeline-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
         .timeline-card-text { font-size: 14px; color: var(--text-primary); font-weight: 500; flex: 1; min-width: 0; word-break: break-word; }
         .timeline-card.overdue .timeline-card-text { color: var(--overdue-text); }
         .timeline-card.done .timeline-card-text { text-decoration: line-through; color: var(--text-secondary); }
-
         .timeline-time {
             font-size: 11px; color: var(--text-secondary);
             white-space: nowrap; flex-shrink: 0;
             margin-top: 2px;
         }
         .timeline-card.overdue .timeline-time { color: var(--overdue-text); opacity: 0.8; }
-
         .timeline-badge {
             display: inline-block; margin-top: 6px;
             font-size: 10px; font-weight: 700;
@@ -403,11 +356,9 @@
         .timeline-badge.overdue-badge { background: var(--overdue-border); color: white; }
         .timeline-badge.today-badge { background: var(--timeline-dot-today); color: white; }
         .timeline-badge.done-badge { background: var(--timeline-dot-done); color: white; }
-
         /* 스피너 */
         .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--spinner-color); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
         /* 반응형 */
         @media (max-width: 540px) {
             body { padding: 16px 12px; justify-content: flex-start; padding-top: 64px; }
@@ -426,7 +377,6 @@
     </style>
 </head>
 <body>
-
 <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</button>
 
 <!-- 로그인 -->
@@ -502,13 +452,10 @@
             </div>
             <button class="btn-logout" onclick="logout()">로그아웃</button>
         </div>
-
         <div class="todo-input-row">
             <input type="text" id="todo-input" placeholder="할 일을 입력하세요...">
             <button class="btn-add" id="btn-add-todo" onclick="addTodo()">+ 등록</button>
         </div>
-
-        <!-- 필터 탭 (리스트 + 타임라인) -->
         <div class="filter-tabs">
             <button class="tab-btn active" onclick="filterTodos('all', this)">전체</button>
             <button class="tab-btn" onclick="filterTodos('active', this)">할 일</button>
@@ -516,11 +463,7 @@
             <button class="tab-btn" onclick="filterTodos('overdue', this)">마감초과</button>
             <button class="tab-btn" id="tab-timeline" onclick="switchToTimeline(this)">타임라인</button>
         </div>
-
-        <!-- 리스트 뷰 -->
         <ul class="todo-list" id="todo-list"></ul>
-
-        <!-- ✅ 타임라인 뷰 -->
         <div id="timeline-view"></div>
     </div>
 </div>
@@ -531,7 +474,9 @@
     let todos = [];
     let isTimelineMode = false;
 
+    // =====================
     // 다크모드
+    // =====================
     function toggleTheme() {
         const html = document.documentElement;
         const isDark = html.getAttribute('data-theme') === 'dark';
@@ -539,7 +484,7 @@
         document.getElementById('theme-btn').textContent = isDark ? '🌑' : '☀️';
         localStorage.setItem('theme', isDark ? 'light' : 'dark');
     }
-    (function() {
+    (function () {
         const saved = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', saved);
         document.addEventListener('DOMContentLoaded', () => {
@@ -552,12 +497,10 @@
         el.type = el.type === 'password' ? 'text' : 'password';
         btn.textContent = el.type === 'password' ? '표시' : '숨기기';
     }
-
     function showSection(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
     }
-
     function showAlert(id, msg, type = 'error') {
         const el = document.getElementById(id);
         el.className = `alert alert-${type}`;
@@ -565,7 +508,6 @@
         el.style.display = 'block';
         setTimeout(() => el.style.display = 'none', 4000);
     }
-
     function setLoading(btnId, loading, text) {
         const btn = document.getElementById(btnId);
         btn.disabled = loading;
@@ -573,18 +515,18 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        ['login-username','login-password'].forEach(id =>
-            document.getElementById(id)?.addEventListener('keydown', e => e.key==='Enter' && login())
+        ['login-username', 'login-password'].forEach(id =>
+            document.getElementById(id)?.addEventListener('keydown', e => e.key === 'Enter' && login())
         );
-        ['signup-username','signup-password','signup-code'].forEach(id =>
-            document.getElementById(id)?.addEventListener('keydown', e => e.key==='Enter' && signup())
+        ['signup-username', 'signup-password', 'signup-code'].forEach(id =>
+            document.getElementById(id)?.addEventListener('keydown', e => e.key === 'Enter' && signup())
         );
-        document.getElementById('signup-email')?.addEventListener('keydown', e => e.key==='Enter' && requestSignupCode());
-        ['reset-code','reset-new-password'].forEach(id =>
-            document.getElementById(id)?.addEventListener('keydown', e => e.key==='Enter' && resetPassword())
+        document.getElementById('signup-email')?.addEventListener('keydown', e => e.key === 'Enter' && requestSignupCode());
+        ['reset-code', 'reset-new-password'].forEach(id =>
+            document.getElementById(id)?.addEventListener('keydown', e => e.key === 'Enter' && resetPassword())
         );
-        document.getElementById('reset-email')?.addEventListener('keydown', e => e.key==='Enter' && requestResetCode());
-        document.getElementById('todo-input')?.addEventListener('keydown', e => e.key==='Enter' && addTodo());
+        document.getElementById('reset-email')?.addEventListener('keydown', e => e.key === 'Enter' && requestResetCode());
+        document.getElementById('todo-input')?.addEventListener('keydown', e => e.key === 'Enter' && addTodo());
     });
 
     // =====================
@@ -596,11 +538,16 @@
         if (!username || !password) { showAlert('login-alert', '아이디와 비밀번호를 입력해주세요.'); return; }
         setLoading('btn-login', true, '로그인');
         try {
-            const res = await fetch(`${API_BASE}/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password}) });
+            const res = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
             const data = await res.json();
             if (!res.ok) { showAlert('login-alert', data.detail || '로그인 실패'); return; }
             localStorage.setItem('token', data.access_token);
-            showSection('section-todo'); loadTodos();
+            showSection('section-todo');
+            loadTodos();
         } catch { showAlert('login-alert', '서버 오류가 발생했습니다.'); }
         finally { setLoading('btn-login', false, '로그인'); }
     }
@@ -611,12 +558,16 @@
         const btn = document.getElementById('btn-request-code');
         btn.disabled = true; btn.textContent = '발송중...';
         try {
-            const res = await fetch(`${API_BASE}/request-code`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+            const res = await fetch(`${API_BASE}/request-code`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
             const data = await res.json();
-            if (!res.ok) { showAlert('signup-alert', data.detail||'요청 실패'); btn.disabled=false; btn.textContent='인증 요청'; return; }
+            if (!res.ok) { showAlert('signup-alert', data.detail || '요청 실패'); btn.disabled = false; btn.textContent = '인증 요청'; return; }
             showAlert('signup-success', '인증번호가 발송되었습니다!', 'success');
             startCooldown(btn, 180);
-        } catch { showAlert('signup-alert', '서버 오류'); btn.disabled=false; btn.textContent='인증 요청'; }
+        } catch { showAlert('signup-alert', '서버 오류'); btn.disabled = false; btn.textContent = '인증 요청'; }
     }
 
     async function signup() {
@@ -624,12 +575,16 @@
         const password = document.getElementById('signup-password').value.trim();
         const email = document.getElementById('signup-email').value.trim();
         const code = document.getElementById('signup-code').value.trim();
-        if (!username||!password||!email||!code) { showAlert('signup-alert','모든 항목을 입력해주세요.'); return; }
+        if (!username || !password || !email || !code) { showAlert('signup-alert', '모든 항목을 입력해주세요.'); return; }
         setLoading('btn-signup', true, '인증 및 가입 완료');
         try {
-            const res = await fetch(`${API_BASE}/signup`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username,password,email,code}) });
+            const res = await fetch(`${API_BASE}/signup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, email, code })
+            });
             const data = await res.json();
-            if (!res.ok) { showAlert('signup-alert', data.detail||'회원가입 실패'); return; }
+            if (!res.ok) { showAlert('signup-alert', data.detail || '회원가입 실패'); return; }
             showAlert('signup-success', '회원가입 성공! 로그인 해주세요.', 'success');
             setTimeout(() => showSection('section-login'), 1500);
         } catch { showAlert('signup-alert', '서버 오류가 발생했습니다.'); }
@@ -642,24 +597,32 @@
         const btn = document.getElementById('btn-request-reset-code');
         btn.disabled = true; btn.textContent = '발송중...';
         try {
-            const res = await fetch(`${API_BASE}/request-reset-code`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+            const res = await fetch(`${API_BASE}/request-reset-code`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
             const data = await res.json();
-            if (!res.ok) { showAlert('reset-alert', data.detail||'요청 실패'); btn.disabled=false; btn.textContent='인증 요청'; return; }
+            if (!res.ok) { showAlert('reset-alert', data.detail || '요청 실패'); btn.disabled = false; btn.textContent = '인증 요청'; return; }
             showAlert('reset-success', '인증번호가 발송되었습니다!', 'success');
             startCooldown(btn, 180);
-        } catch { showAlert('reset-alert', '서버 오류'); btn.disabled=false; btn.textContent='인증 요청'; }
+        } catch { showAlert('reset-alert', '서버 오류'); btn.disabled = false; btn.textContent = '인증 요청'; }
     }
 
     async function resetPassword() {
         const email = document.getElementById('reset-email').value.trim();
         const code = document.getElementById('reset-code').value.trim();
         const new_password = document.getElementById('reset-new-password').value.trim();
-        if (!email||!code||!new_password) { showAlert('reset-alert','모든 항목을 입력해주세요.'); return; }
+        if (!email || !code || !new_password) { showAlert('reset-alert', '모든 항목을 입력해주세요.'); return; }
         setLoading('btn-reset', true, '비밀번호 변경');
         try {
-            const res = await fetch(`${API_BASE}/reset-password`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,code,new_password}) });
+            const res = await fetch(`${API_BASE}/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, code, new_password })
+            });
             const data = await res.json();
-            if (!res.ok) { showAlert('reset-alert', data.detail||'재설정 실패'); return; }
+            if (!res.ok) { showAlert('reset-alert', data.detail || '재설정 실패'); return; }
             showAlert('reset-success', '비밀번호가 변경되었습니다!', 'success');
             setTimeout(() => showSection('section-login'), 1500);
         } catch { showAlert('reset-alert', '서버 오류가 발생했습니다.'); }
@@ -671,7 +634,7 @@
         const timer = setInterval(() => {
             btn.textContent = `재요청 (${count}s)`;
             count--;
-            if (count < 0) { clearInterval(timer); btn.disabled=false; btn.textContent='인증 요청'; }
+            if (count < 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '인증 요청'; }
         }, 1000);
     }
 
@@ -681,57 +644,69 @@
     async function loadTodos() {
         const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${API_BASE}/todos`, { headers: {'Authorization': `Bearer ${token}`} });
+            const res = await fetch(`${API_BASE}/todos`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (res.status === 401) { logout(); return; }
             todos = await res.json();
             render();
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
     async function addTodo() {
         const input = document.getElementById('todo-input');
         const content = input.value.trim();
-        if (!content) { input.style.borderColor='#cc1016'; setTimeout(()=>input.style.borderColor='', 1000); return; }
+        if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
         const btn = document.getElementById('btn-add-todo');
         if (btn.disabled) return;
-        btn.disabled=true; btn.innerHTML=`<span class="spinner"></span>`;
+        btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/todos`, {
-                method:'POST',
-                headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
-                body: JSON.stringify({content})
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ content })
             });
             if (res.status === 401) { logout(); return; }
             const newTodo = await res.json();
-            todos.push({id: newTodo.id, content: newTodo.content, completed: false, deadline: null});
-            input.value = ''; render();
-        } catch(e) { console.error(e); }
-        finally { btn.disabled=false; btn.innerHTML='+ 등록'; }
+            todos.push({ id: newTodo.id, content: newTodo.content, completed: false, deadline: null });
+            input.value = '';
+            render();
+        } catch (e) { console.error(e); }
+        finally { btn.disabled = false; btn.innerHTML = '+ 등록'; }
     }
 
     async function toggleTodo(id) {
         const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${API_BASE}/todos/${id}/toggle`, { method:'PATCH', headers:{'Authorization':`Bearer ${token}`} });
+            const res = await fetch(`${API_BASE}/todos/${id}/toggle`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (!res.ok) return;
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) todo.completed = updated.completed;
             render();
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
     async function deleteTodo(id) {
         const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${API_BASE}/todos/${id}`, { method:'DELETE', headers:{'Authorization':`Bearer ${token}`} });
+            const res = await fetch(`${API_BASE}/todos/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (!res.ok) return;
-            todos = todos.filter(t => t.id !== id); render();
-        } catch(e) { console.error(e); }
+            todos = todos.filter(t => t.id !== id);
+            render();
+        } catch (e) { console.error(e); }
     }
 
-    // ✅ 마감기한 패널 토글
+    // =====================
+    // 마감기한
+    // =====================
     function toggleDeadlinePanel(id) {
         const panel = document.getElementById(`deadline-panel-${id}`);
         const btn = document.getElementById(`btn-deadline-${id}`);
@@ -741,50 +716,50 @@
         } else {
             panel.classList.add('open');
             btn.classList.add('active');
-            // 기존 마감기한 있으면 input에 채우기
             const todo = todos.find(t => t.id === id);
             if (todo?.deadline) {
+                // ✅ 서버에서 받은 ISO 문자열을 로컬 시간으로 변환해서 input에 표시
                 const dt = new Date(todo.deadline);
-                const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
+                    .toISOString().slice(0, 16);
                 document.getElementById(`deadline-input-${id}`).value = local;
             }
         }
     }
 
-    // ✅ 마감기한 저장
     async function saveDeadline(id) {
         const input = document.getElementById(`deadline-input-${id}`);
-        const val = input.value;
+        const val = input.value; // "2024-01-01T15:00" 형식 (로컬 시간)
         if (!val) { alert('날짜와 시간을 선택해주세요.'); return; }
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/todos/${id}/deadline`, {
-                method:'PATCH',
-                headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
-                body: JSON.stringify({ deadline: new Date(val).toISOString() })
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                // ✅ 핵심 수정: toISOString() 제거 → 로컬 시간 문자열 그대로 전송
+                body: JSON.stringify({ deadline: val })
             });
             if (!res.ok) return;
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) todo.deadline = updated.deadline;
             render();
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
-    // ✅ 마감기한 제거
     async function removeDeadline(id) {
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/todos/${id}/deadline`, {
-                method:'PATCH',
-                headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ deadline: null })
             });
             if (!res.ok) return;
             const todo = todos.find(t => t.id === id);
             if (todo) todo.deadline = null;
             render();
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
     // =====================
@@ -809,24 +784,20 @@
         renderTimeline();
     }
 
-    // ✅ 마감기한 지났는지 확인
     function isOverdue(todo) {
         if (!todo.deadline || todo.completed) return false;
         return new Date(todo.deadline) < new Date();
     }
 
-    // ✅ 마감기한 포맷
     function formatDeadline(isoStr) {
         if (!isoStr) return '';
         const d = new Date(isoStr);
-        const now = new Date();
-        const isOD = d < now;
+        const isOD = d < new Date();
         const month = d.getMonth() + 1;
         const day = d.getDate();
         const hour = d.getHours().toString().padStart(2, '0');
         const min = d.getMinutes().toString().padStart(2, '0');
-        const prefix = isOD ? '⚠️ ' : '⏰ ';
-        return `${prefix}${month}/${day} ${hour}:${min}`;
+        return `${isOD ? '⚠️ ' : '⏰ '}${month}/${day} ${hour}:${min}`;
     }
 
     // =====================
@@ -835,19 +806,16 @@
     function render() {
         if (isTimelineMode) { renderTimeline(); return; }
         const list = document.getElementById('todo-list');
-        const now = new Date();
         let filtered = todos;
         if (currentFilter === 'active')    filtered = todos.filter(t => !t.completed);
         if (currentFilter === 'completed') filtered = todos.filter(t => t.completed);
         if (currentFilter === 'overdue')   filtered = todos.filter(t => isOverdue(t));
-
         if (filtered.length === 0) {
-            const msgs = { all:'할 일을 추가해보세요!', active:'할 일이 없어요!', completed:'완료된 항목이 없어요!', overdue:'마감 초과된 항목이 없어요! 🎉' };
-            const emojis = { all:'📋', active:'✨', completed:'🎉', overdue:'✅' };
-            list.innerHTML = `<div class="empty-state"><div class="emoji">${emojis[currentFilter]||'📋'}</div><p>${msgs[currentFilter]||'할 일을 추가해보세요!'}</p></div>`;
+            const msgs  = { all: '할 일을 추가해보세요!', active: '할 일이 없어요!', completed: '완료된 항목이 없어요!', overdue: '마감 초과된 항목이 없어요! 🎉' };
+            const emojis = { all: '📋', active: '✨', completed: '🎉', overdue: '✅' };
+            list.innerHTML = `<div class="empty-state"><div class="emoji">${emojis[currentFilter] || '📋'}</div><p>${msgs[currentFilter] || '할 일을 추가해보세요!'}</p></div>`;
             return;
         }
-
         list.innerHTML = filtered.map(t => {
             const overdue = isOverdue(t);
             const chipHtml = t.deadline
@@ -866,7 +834,6 @@
                         <button class="btn-delete" onclick="deleteTodo(${t.id})">삭제</button>
                     </div>
                 </div>
-                <!-- ✅ 마감기한 picker 패널 -->
                 <div class="deadline-panel" id="deadline-panel-${t.id}">
                     <label>마감기한</label>
                     <input type="datetime-local" id="deadline-input-${t.id}">
@@ -878,55 +845,48 @@
     }
 
     // =====================
-    // ✅ 타임라인 렌더링
+    // 타임라인 렌더링
     // =====================
     function renderTimeline() {
         const view = document.getElementById('timeline-view');
         const todosWithDeadline = [...todos]
             .filter(t => t.deadline)
             .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-
         if (todosWithDeadline.length === 0) {
             view.innerHTML = `<div class="timeline-empty"><div class="emoji">📅</div><p>마감기한이 설정된 할 일이 없어요!<br>투두에 📅 버튼으로 마감기한을 추가해보세요.</p></div>`;
             return;
         }
-
         const now = new Date();
         const todayStr = now.toDateString();
-
-        // 날짜별 그룹핑
         const groups = {};
         todosWithDeadline.forEach(t => {
-            const d = new Date(t.deadline);
-            const key = d.toDateString();
+            const key = new Date(t.deadline).toDateString();
             if (!groups[key]) groups[key] = [];
             groups[key].push(t);
         });
-
         let html = '';
         Object.entries(groups).forEach(([dateStr, items]) => {
             const groupDate = new Date(dateStr);
             const isPast = groupDate < new Date(now.toDateString());
             const isToday = dateStr === todayStr;
-
             const labelClass = isPast ? 'overdue-label' : (isToday ? 'today-label' : '');
-            const dateLabel = isToday ? '오늘' : isPast ? `${groupDate.getMonth()+1}/${groupDate.getDate()} (지남)` : `${groupDate.getMonth()+1}월 ${groupDate.getDate()}일`;
-
+            const dateLabel = isToday
+                ? '오늘'
+                : isPast
+                    ? `${groupDate.getMonth() + 1}/${groupDate.getDate()} (지남)`
+                    : `${groupDate.getMonth() + 1}월 ${groupDate.getDate()}일`;
             html += `<div class="timeline-group">
                 <div class="timeline-date-label ${labelClass}">${dateLabel}</div>`;
-
-            items.forEach((t, idx) => {
+            items.forEach(t => {
                 const d = new Date(t.deadline);
-                const timeStr = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+                const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
                 const overdue = isOverdue(t);
-                const dotClass = t.completed ? 'done' : (overdue ? 'overdue' : (isToday ? 'today' : ''));
+                const dotClass  = t.completed ? 'done' : (overdue ? 'overdue' : (isToday ? 'today' : ''));
                 const cardClass = t.completed ? 'done' : (overdue ? 'overdue' : '');
-
                 let badge = '';
-                if (t.completed) badge = `<span class="timeline-badge done-badge">✓ 완료</span>`;
-                else if (overdue) badge = `<span class="timeline-badge overdue-badge">⚠️ 마감 초과</span>`;
-                else if (isToday) badge = `<span class="timeline-badge today-badge">오늘 마감</span>`;
-
+                if (t.completed)   badge = `<span class="timeline-badge done-badge">✓ 완료</span>`;
+                else if (overdue)  badge = `<span class="timeline-badge overdue-badge">⚠️ 마감 초과</span>`;
+                else if (isToday)  badge = `<span class="timeline-badge today-badge">오늘 마감</span>`;
                 html += `
                 <div class="timeline-item">
                     <div class="timeline-line-col">
@@ -941,19 +901,19 @@
                     </div>
                 </div>`;
             });
-
             html += `</div>`;
         });
-
         view.innerHTML = html;
     }
 
     function escapeHtml(str) {
-        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function logout() {
-        localStorage.removeItem('token'); todos = []; showSection('section-login');
+        localStorage.removeItem('token');
+        todos = [];
+        showSection('section-login');
     }
 
     window.onload = () => {
