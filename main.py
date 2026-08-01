@@ -10,7 +10,25 @@ from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable,
 from datetime import datetime, timedelta, timezone
 import jwt
 import httpx
+import calendar
 from apscheduler.schedulers.background import BackgroundScheduler
+
+REPEAT_CYCLES = {"none", "daily", "weekly", "monthly"}
+
+
+def add_interval(dt: datetime, cycle: str):
+    """마감일을 반복 주기만큼 뒤로 이동시킨 새 datetime을 반환. (반복 없음이면 None)"""
+    if cycle == "daily":
+        return dt + timedelta(days=1)
+    if cycle == "weekly":
+        return dt + timedelta(weeks=1)
+    if cycle == "monthly":
+        month = dt.month + 1
+        year = dt.year + (month - 1) // 12
+        month = (month - 1) % 12 + 1
+        day = min(dt.day, calendar.monthrange(year, month)[1])
+        return dt.replace(year=year, month=month, day=day)
+    return None
 
 load_dotenv()
 
@@ -27,7 +45,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -58,8 +76,11 @@ def get_db():
 
 
 def get_current_user_id(authorization: Annotated[str | None, Header()] = None):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증 정보가 없습니다.")
+    token = authorization[7:]
     try:
-        decoded_payload = jwt.decode(authorization[7:], SECRET_KEY, algorithms=[ALGORITHM])
+        decoded_payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = decoded_payload.get("sub")
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="토큰이 만료되었습니다.")
@@ -125,9 +146,13 @@ def login_todo(login_data: dict, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="ID가 맞지 않습니다.")
     if bcrypt.checkpw(login_data.get("password").encode("utf-8"), user.password.encode("utf-8")):
-        token = jwt.encode({"sub": user.user_id}, SECRET_KEY, algorithm=ALGORITHM)
+        payload = {
+            "sub": user.user_id,
+            "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
         return {"access_token": token}
-    raise HTTPException(status_code=404, detail="비밀번호가 맞지 않습니다.")
+    raise HTTPException(status_code=401, detail="비밀번호가 맞지 않습니다.")
 
 
 @app.post("/request-reset-code")
@@ -185,7 +210,9 @@ def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session
         "id": t.id,
         "content": t.todo,
         "completed": t.completed,
-        "deadline": t.deadline.isoformat() if t.deadline else None
+        "deadline": t.deadline.isoformat() if t.deadline else None,
+        "category": t.category,
+        "repeat": t.repeat_cycle
     } for t in todos]
 
 
@@ -195,14 +222,25 @@ def create_todo(todo_data: dict, authorization: Annotated[str | None, Header()] 
     user_id = get_current_user_id(authorization)
     deadline_str = todo_data.get("deadline")
     deadline = datetime.fromisoformat(deadline_str) if deadline_str else None
-    new_todo = TodoTable(todo=content, owner_id=user_id, deadline=deadline)
+    category = (todo_data.get("category") or None)
+    if category:
+        category = category.strip()[:50] or None
+    repeat = todo_data.get("repeat") or "none"
+    if repeat not in REPEAT_CYCLES:
+        repeat = "none"
+    new_todo = TodoTable(
+        todo=content, owner_id=user_id, deadline=deadline,
+        category=category, repeat_cycle=repeat
+    )
     db.add(new_todo)
     db.commit()
     db.refresh(new_todo)
     return {
         "id": new_todo.id,
         "content": new_todo.todo,
-        "deadline": new_todo.deadline.isoformat() if new_todo.deadline else None
+        "deadline": new_todo.deadline.isoformat() if new_todo.deadline else None,
+        "category": new_todo.category,
+        "repeat": new_todo.repeat_cycle
     }
 
 
@@ -228,8 +266,60 @@ def toggle_todo(id: int, authorization: Annotated[str | None, Header()] = None, 
     if todo.owner_id != user_id:
         raise HTTPException(status_code=403, detail="본인 리스트가 아닙니다.")
     todo.completed = not todo.completed
+    spawned = None
+    # 반복 투두를 '완료'로 체크하면 다음 회차를 자동 생성
+    if todo.completed and todo.repeat_cycle != "none" and todo.deadline:
+        next_deadline = add_interval(todo.deadline, todo.repeat_cycle)
+        if next_deadline:
+            spawned = TodoTable(
+                todo=todo.todo, owner_id=todo.owner_id, deadline=next_deadline,
+                category=todo.category, repeat_cycle=todo.repeat_cycle,
+                completed=False, reminder_sent=False
+            )
+            db.add(spawned)
     db.commit()
-    return {"id": todo.id, "completed": todo.completed}
+    result = {"id": todo.id, "completed": todo.completed}
+    if spawned:
+        db.refresh(spawned)
+        result["spawned"] = {
+            "id": spawned.id,
+            "content": spawned.todo,
+            "completed": False,
+            "deadline": spawned.deadline.isoformat() if spawned.deadline else None,
+            "category": spawned.category,
+            "repeat": spawned.repeat_cycle
+        }
+    return result
+
+
+@app.patch("/todos/{id}")
+def update_todo(id: int, data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    todo = db.query(TodoTable).filter(TodoTable.id == id).first()
+    if not todo:
+        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
+    if todo.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="본인 리스트가 아닙니다.")
+    if "content" in data:
+        content = (data.get("content") or "").strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
+        todo.todo = content
+    if "category" in data:
+        category = data.get("category")
+        todo.category = (category.strip()[:50] or None) if category else None
+    if "repeat" in data:
+        repeat = data.get("repeat") or "none"
+        todo.repeat_cycle = repeat if repeat in REPEAT_CYCLES else "none"
+    db.commit()
+    return {
+        "id": todo.id,
+        "content": todo.todo,
+        "completed": todo.completed,
+        "deadline": todo.deadline.isoformat() if todo.deadline else None,
+        "category": todo.category,
+        "repeat": todo.repeat_cycle
+    }
 
 
 @app.patch("/todos/{id}/deadline")
@@ -288,7 +378,7 @@ def keep_alive():
     try:
         httpx.get("https://todolist-ezpr.onrender.com")
         print("✅ Keep alive ping 성공")
-    except:
+    except Exception:
         pass
 
 

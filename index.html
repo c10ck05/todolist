@@ -203,6 +203,7 @@
             transition: all 0.2s;
             animation: slideIn 0.25s ease;
             overflow: hidden;
+            flex-shrink: 0; /* 항목이 많아도 세로로 눌리지 않고 스크롤되도록 */
         }
         @keyframes slideIn { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
         .todo-item:hover { background: var(--todo-item-hover); border-color: var(--input-border-focus); }
@@ -273,6 +274,35 @@
         .btn-deadline-save:hover { background: var(--btn-primary-hover); }
         .btn-deadline-remove { padding: 7px 10px; background: none; border: 1px solid var(--logout-border); color: var(--logout-color); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
         .btn-deadline-remove:hover { background: var(--logout-bg); }
+        /* 카테고리 / 반복 */
+        .category-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            margin-top: 4px; margin-left: 6px;
+            font-size: 11px; font-weight: 600;
+            padding: 2px 8px; border-radius: 20px;
+            background: var(--tab-active-bg); color: var(--btn-primary-text);
+        }
+        .repeat-icon { font-size: 11px; margin-left: 4px; opacity: 0.75; }
+        .deadline-panel input[type="text"], .deadline-panel select {
+            padding: 7px 10px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-primary);
+            background: var(--input-bg);
+            outline: none;
+        }
+        .deadline-panel input[type="text"] { min-width: 120px; }
+        .deadline-panel input[type="text"]:focus, .deadline-panel select:focus { border-color: var(--input-border-focus); }
+        .todo-category-input {
+            width: 130px; padding: 13px 14px;
+            border: 1px solid var(--input-border); border-radius: 8px;
+            font-size: 15px; color: var(--text-primary);
+            background: var(--input-bg); outline: none;
+            transition: all 0.2s; -webkit-appearance: none;
+        }
+        .todo-category-input::placeholder { color: var(--text-secondary); }
+        .todo-category-input:focus { border-color: var(--input-border-focus); box-shadow: 0 0 0 3px rgba(10,102,194,0.12); }
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
         .empty-state .emoji { font-size: 44px; margin-bottom: 10px; }
         .empty-state p { font-size: 14px; }
@@ -369,6 +399,7 @@
             .email-row { flex-direction: column; }
             .btn-verify { width: 100%; padding: 13px; text-align: center; }
             .todo-input-row { flex-direction: column; }
+            .todo-category-input { width: 100%; }
             .btn-add { width: 100%; padding: 13px; }
             .theme-toggle { top: 12px; right: 12px; width: 40px; height: 40px; font-size: 18px; }
             .deadline-panel { flex-direction: column; align-items: stretch; }
@@ -454,8 +485,10 @@
         </div>
         <div class="todo-input-row">
             <input type="text" id="todo-input" placeholder="할 일을 입력하세요...">
+            <input type="text" id="todo-category" class="todo-category-input" placeholder="카테고리(선택)" list="category-list">
             <button class="btn-add" id="btn-add-todo" onclick="addTodo()">+ 등록</button>
         </div>
+        <datalist id="category-list"></datalist>
         <div class="filter-tabs">
             <button class="tab-btn active" onclick="filterTodos('all', this)">전체</button>
             <button class="tab-btn" onclick="filterTodos('active', this)">할 일</button>
@@ -463,6 +496,7 @@
             <button class="tab-btn" onclick="filterTodos('overdue', this)">마감초과</button>
             <button class="tab-btn" id="tab-timeline" onclick="switchToTimeline(this)">타임라인</button>
         </div>
+        <div class="filter-tabs" id="category-filters"></div>
         <ul class="todo-list" id="todo-list"></ul>
         <div id="timeline-view"></div>
     </div>
@@ -471,8 +505,10 @@
 <script>
     const API_BASE = "https://todolist-ezpr.onrender.com";
     let currentFilter = 'all';
+    let currentCategory = 'all';
     let todos = [];
     let isTimelineMode = false;
+    const REPEAT_LABELS = { none: '', daily: '매일', weekly: '매주', monthly: '매월' };
 
     // =====================
     // 다크모드
@@ -655,8 +691,10 @@
 
     async function addTodo() {
         const input = document.getElementById('todo-input');
+        const catInput = document.getElementById('todo-category');
         const content = input.value.trim();
         if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
+        const category = catInput.value.trim() || null;
         const btn = document.getElementById('btn-add-todo');
         if (btn.disabled) return;
         btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
@@ -665,16 +703,36 @@
             const res = await fetch(`${API_BASE}/todos`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ content })
+                body: JSON.stringify({ content, category })
             });
             if (res.status === 401) { logout(); return; }
             const newTodo = await res.json();
-            todos.push({ id: newTodo.id, content: newTodo.content, completed: false, deadline: null });
+            todos.push({ id: newTodo.id, content: newTodo.content, completed: false, deadline: null, category: newTodo.category, repeat: newTodo.repeat });
             input.value = '';
+            catInput.value = '';
             render();
         } catch (e) { console.error(e); }
         finally { btn.disabled = false; btn.innerHTML = '+ 등록'; }
     }
+
+    // 카테고리 / 반복 수정 (PATCH /todos/{id})
+    async function updateTodoField(id, patch) {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE}/todos/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(patch)
+            });
+            if (!res.ok) return;
+            const updated = await res.json();
+            const todo = todos.find(t => t.id === id);
+            if (todo) { todo.category = updated.category; todo.repeat = updated.repeat; }
+            render();
+        } catch (e) { console.error(e); }
+    }
+    function updateCategory(id, value) { updateTodoField(id, { category: value.trim() || null }); }
+    function updateRepeat(id, value) { updateTodoField(id, { repeat: value }); }
 
     async function toggleTodo(id) {
         const token = localStorage.getItem('token');
@@ -687,6 +745,8 @@
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) todo.completed = updated.completed;
+            // 반복 투두 완료 시 서버가 만든 다음 회차를 목록에 추가
+            if (updated.spawned) todos.push(updated.spawned);
             render();
         } catch (e) { console.error(e); }
     }
@@ -803,13 +863,48 @@
     // =====================
     // 리스트 렌더링
     // =====================
+    // 현재 존재하는 카테고리 목록 (사용 중인 카테고리들)
+    function getCategories() {
+        return [...new Set(todos.map(t => t.category).filter(Boolean))].sort();
+    }
+
+    function repeatOptions(selected) {
+        return Object.entries(REPEAT_LABELS).map(([val, label]) =>
+            `<option value="${val}" ${val === (selected || 'none') ? 'selected' : ''}>${val === 'none' ? '없음' : label}</option>`
+        ).join('');
+    }
+
+    // 카테고리 필터 칩 + 입력 자동완성(datalist) 갱신
+    function renderCategoryChips() {
+        const cats = getCategories();
+        const container = document.getElementById('category-filters');
+        if (cats.length === 0) { container.innerHTML = ''; currentCategory = 'all'; }
+        else {
+            const chips = [['all', '전체 카테고리'], ...cats.map(c => [c, c]), ['none', '미분류']];
+            container.innerHTML = chips.map(([val, label]) =>
+                `<button class="tab-btn ${currentCategory === val ? 'active' : ''}" onclick="filterByCategory('${encodeURIComponent(val)}', this)">${escapeHtml(label)}</button>`
+            ).join('');
+        }
+        document.getElementById('category-list').innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
+    }
+
+    function filterByCategory(encoded, btn) {
+        currentCategory = decodeURIComponent(encoded);
+        document.querySelectorAll('#category-filters .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        render();
+    }
+
     function render() {
+        renderCategoryChips();
         if (isTimelineMode) { renderTimeline(); return; }
         const list = document.getElementById('todo-list');
         let filtered = todos;
-        if (currentFilter === 'active')    filtered = todos.filter(t => !t.completed);
-        if (currentFilter === 'completed') filtered = todos.filter(t => t.completed);
-        if (currentFilter === 'overdue')   filtered = todos.filter(t => isOverdue(t));
+        if (currentFilter === 'active')    filtered = filtered.filter(t => !t.completed);
+        if (currentFilter === 'completed') filtered = filtered.filter(t => t.completed);
+        if (currentFilter === 'overdue')   filtered = filtered.filter(t => isOverdue(t));
+        if (currentCategory === 'none')     filtered = filtered.filter(t => !t.category);
+        else if (currentCategory !== 'all') filtered = filtered.filter(t => t.category === currentCategory);
         if (filtered.length === 0) {
             const msgs  = { all: '할 일을 추가해보세요!', active: '할 일이 없어요!', completed: '완료된 항목이 없어요!', overdue: '마감 초과된 항목이 없어요! 🎉' };
             const emojis = { all: '📋', active: '✨', completed: '🎉', overdue: '✅' };
@@ -821,13 +916,15 @@
             const chipHtml = t.deadline
                 ? `<span class="deadline-chip ${overdue ? 'overdue' : ''}">${formatDeadline(t.deadline)}</span>`
                 : '';
+            const catHtml = t.category ? `<span class="category-badge">🏷 ${escapeHtml(t.category)}</span>` : '';
+            const repeatHtml = (t.repeat && t.repeat !== 'none') ? `<span class="repeat-icon">🔁 ${REPEAT_LABELS[t.repeat]}</span>` : '';
             return `
             <li class="todo-item ${t.completed ? 'completed' : ''} ${overdue ? 'overdue' : ''}">
                 <div class="todo-item-main">
                     <div class="todo-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTodo(${t.id})"></div>
                     <div class="todo-content">
-                        <div class="todo-text">${escapeHtml(t.content)}</div>
-                        ${chipHtml}
+                        <div class="todo-text">${escapeHtml(t.content)}${repeatHtml}</div>
+                        ${chipHtml}${catHtml}
                     </div>
                     <div class="todo-actions">
                         <button class="btn-deadline ${t.deadline ? 'active' : ''}" id="btn-deadline-${t.id}" onclick="toggleDeadlinePanel(${t.id})">📅</button>
@@ -835,6 +932,10 @@
                     </div>
                 </div>
                 <div class="deadline-panel" id="deadline-panel-${t.id}">
+                    <label>카테고리</label>
+                    <input type="text" list="category-list" id="category-input-${t.id}" value="${escapeHtml(t.category || '')}" placeholder="없음" onchange="updateCategory(${t.id}, this.value)">
+                    <label>반복</label>
+                    <select id="repeat-input-${t.id}" onchange="updateRepeat(${t.id}, this.value)">${repeatOptions(t.repeat)}</select>
                     <label>마감기한</label>
                     <input type="datetime-local" id="deadline-input-${t.id}">
                     <button class="btn-deadline-save" onclick="saveDeadline(${t.id})">저장</button>

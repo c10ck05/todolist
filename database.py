@@ -21,6 +21,8 @@ class TodoTable(Base):
     completed = Column(Boolean, default=False, nullable=False)
     deadline = Column(DateTime, nullable=True)
     reminder_sent = Column(Boolean, default=False, nullable=False)
+    category = Column(String(50), nullable=True)
+    repeat_cycle = Column(String(20), default="none", nullable=False)
 
 
 class UserTable(Base):
