@@ -6,7 +6,7 @@ import bcrypt
 import resend
 import random, os
 from dotenv import load_dotenv
-from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable, engine, Base
+from database import SessionLocal, TodoTable, UserTable, EmailVerificationTable, SubtaskTable, engine, Base
 from datetime import datetime, timedelta, timezone
 import jwt
 import httpx
@@ -14,6 +14,25 @@ import calendar
 from apscheduler.schedulers.background import BackgroundScheduler
 
 REPEAT_CYCLES = {"none", "daily", "weekly", "monthly"}
+
+
+def todo_dict(t, subtasks=None):
+    return {
+        "id": t.id,
+        "content": t.todo,
+        "completed": t.completed,
+        "deadline": t.deadline.isoformat() if t.deadline else None,
+        "category": t.category,
+        "repeat": t.repeat_cycle,
+        "priority": t.priority,
+        "detail": t.detail,
+        "sort_order": t.sort_order,
+        "subtasks": subtasks if subtasks is not None else [],
+    }
+
+
+def subtask_dict(s):
+    return {"id": s.id, "content": s.content, "completed": s.completed}
 
 
 def add_interval(dt: datetime, cycle: str):
@@ -205,15 +224,16 @@ def reset_password(reset_data: dict, db: Session = Depends(get_db)):
 @app.get("/todos")
 def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
     user_id = get_current_user_id(authorization)
-    todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id).all()
-    return [{
-        "id": t.id,
-        "content": t.todo,
-        "completed": t.completed,
-        "deadline": t.deadline.isoformat() if t.deadline else None,
-        "category": t.category,
-        "repeat": t.repeat_cycle
-    } for t in todos]
+    todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id).order_by(
+        TodoTable.sort_order.is_(None), TodoTable.sort_order, TodoTable.id
+    ).all()
+    todo_ids = [t.id for t in todos]
+    subs_by_todo = {}
+    if todo_ids:
+        subs = db.query(SubtaskTable).filter(SubtaskTable.todo_id.in_(todo_ids)).order_by(SubtaskTable.id).all()
+        for s in subs:
+            subs_by_todo.setdefault(s.todo_id, []).append(subtask_dict(s))
+    return [todo_dict(t, subs_by_todo.get(t.id, [])) for t in todos]
 
 
 @app.post("/todos")
@@ -228,20 +248,18 @@ def create_todo(todo_data: dict, authorization: Annotated[str | None, Header()] 
     repeat = todo_data.get("repeat") or "none"
     if repeat not in REPEAT_CYCLES:
         repeat = "none"
+    priority = todo_data.get("priority", 1)
+    if priority not in (0, 1, 2):
+        priority = 1
+    detail = (todo_data.get("detail") or None)
     new_todo = TodoTable(
         todo=content, owner_id=user_id, deadline=deadline,
-        category=category, repeat_cycle=repeat
+        category=category, repeat_cycle=repeat, priority=priority, detail=detail
     )
     db.add(new_todo)
     db.commit()
     db.refresh(new_todo)
-    return {
-        "id": new_todo.id,
-        "content": new_todo.todo,
-        "deadline": new_todo.deadline.isoformat() if new_todo.deadline else None,
-        "category": new_todo.category,
-        "repeat": new_todo.repeat_cycle
-    }
+    return todo_dict(new_todo)
 
 
 @app.delete("/todos/{id}")
@@ -274,6 +292,7 @@ def toggle_todo(id: int, authorization: Annotated[str | None, Header()] = None, 
             spawned = TodoTable(
                 todo=todo.todo, owner_id=todo.owner_id, deadline=next_deadline,
                 category=todo.category, repeat_cycle=todo.repeat_cycle,
+                priority=todo.priority, detail=todo.detail,
                 completed=False, reminder_sent=False
             )
             db.add(spawned)
@@ -281,14 +300,7 @@ def toggle_todo(id: int, authorization: Annotated[str | None, Header()] = None, 
     result = {"id": todo.id, "completed": todo.completed}
     if spawned:
         db.refresh(spawned)
-        result["spawned"] = {
-            "id": spawned.id,
-            "content": spawned.todo,
-            "completed": False,
-            "deadline": spawned.deadline.isoformat() if spawned.deadline else None,
-            "category": spawned.category,
-            "repeat": spawned.repeat_cycle
-        }
+        result["spawned"] = todo_dict(spawned)
     return result
 
 
@@ -311,15 +323,15 @@ def update_todo(id: int, data: dict, authorization: Annotated[str | None, Header
     if "repeat" in data:
         repeat = data.get("repeat") or "none"
         todo.repeat_cycle = repeat if repeat in REPEAT_CYCLES else "none"
+    if "priority" in data:
+        p = data.get("priority")
+        if p in (0, 1, 2):
+            todo.priority = p
+    if "detail" in data:
+        detail = data.get("detail")
+        todo.detail = (detail.strip() or None) if detail else None
     db.commit()
-    return {
-        "id": todo.id,
-        "content": todo.todo,
-        "completed": todo.completed,
-        "deadline": todo.deadline.isoformat() if todo.deadline else None,
-        "category": todo.category,
-        "repeat": todo.repeat_cycle
-    }
+    return todo_dict(todo)
 
 
 @app.patch("/todos/{id}/deadline")
@@ -338,6 +350,114 @@ def update_deadline(id: int, data: dict, authorization: Annotated[str | None, He
         "id": todo.id,
         "deadline": todo.deadline.isoformat() if todo.deadline else None
     }
+
+
+@app.post("/todos/reorder")
+def reorder_todos(data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    order = data.get("order") or []
+    todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id).all()
+    todo_map = {t.id: t for t in todos}
+    for index, todo_id in enumerate(order):
+        todo = todo_map.get(todo_id)
+        if todo:
+            todo.sort_order = index
+    db.commit()
+    return {"message": "순서가 저장되었습니다."}
+
+
+# =====================
+# 서브태스크 (체크리스트)
+# =====================
+def _get_owned_todo(id: int, user_id: str, db: Session):
+    todo = db.query(TodoTable).filter(TodoTable.id == id).first()
+    if not todo:
+        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
+    if todo.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="본인 리스트가 아닙니다.")
+    return todo
+
+
+@app.post("/todos/{id}/subtasks")
+def create_subtask(id: int, data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    _get_owned_todo(id, user_id, db)
+    content = (data.get("content") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
+    sub = SubtaskTable(todo_id=id, content=content, completed=False)
+    db.add(sub)
+    db.commit()
+    db.refresh(sub)
+    return subtask_dict(sub)
+
+
+@app.patch("/subtasks/{sid}")
+def update_subtask(sid: int, data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    sub = db.query(SubtaskTable).filter(SubtaskTable.id == sid).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
+    _get_owned_todo(sub.todo_id, user_id, db)
+    if "completed" in data:
+        sub.completed = bool(data.get("completed"))
+    if "content" in data:
+        content = (data.get("content") or "").strip()
+        if content:
+            sub.content = content
+    db.commit()
+    return subtask_dict(sub)
+
+
+@app.delete("/subtasks/{sid}")
+def delete_subtask(sid: int, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    sub = db.query(SubtaskTable).filter(SubtaskTable.id == sid).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
+    _get_owned_todo(sub.todo_id, user_id, db)
+    db.delete(sub)
+    db.commit()
+    return {"message": "삭제 완료"}
+
+
+# =====================
+# 계정 관리 (비밀번호 변경 / 탈퇴)
+# =====================
+@app.post("/change-password")
+def change_password(data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    user = db.query(UserTable).filter(UserTable.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    current = (data.get("current_password") or "").encode("utf-8")
+    if not bcrypt.checkpw(current, user.password.encode("utf-8")):
+        raise HTTPException(status_code=400, detail="현재 비밀번호가 일치하지 않습니다.")
+    new_password = data.get("new_password") or ""
+    if len(new_password) < 4:
+        raise HTTPException(status_code=400, detail="새 비밀번호는 4자 이상이어야 합니다.")
+    user.password = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    db.commit()
+    return {"message": "비밀번호가 변경되었습니다."}
+
+
+@app.delete("/account")
+def delete_account(data: dict, authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
+    user_id = get_current_user_id(authorization)
+    user = db.query(UserTable).filter(UserTable.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    password = (data.get("password") or "").encode("utf-8")
+    if not bcrypt.checkpw(password, user.password.encode("utf-8")):
+        raise HTTPException(status_code=400, detail="비밀번호가 일치하지 않습니다.")
+    todo_ids = [t.id for t in db.query(TodoTable).filter(TodoTable.owner_id == user_id).all()]
+    if todo_ids:
+        db.query(SubtaskTable).filter(SubtaskTable.todo_id.in_(todo_ids)).delete(synchronize_session=False)
+    db.query(TodoTable).filter(TodoTable.owner_id == user_id).delete(synchronize_session=False)
+    db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user.email).delete(synchronize_session=False)
+    db.delete(user)
+    db.commit()
+    return {"message": "계정이 삭제되었습니다."}
 
 
 # =====================

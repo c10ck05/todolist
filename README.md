@@ -47,10 +47,18 @@
 | 기능 | 설명 |
 |------|------|
 | 투두 추가 / 삭제 | 본인 투두만 수정·삭제 가능 |
+| 내용 수정 | 텍스트 더블클릭으로 인라인 편집 |
 | 완료 토글 | 체크박스 클릭으로 완료 처리 |
-| 마감기한 설정 | datetime-local picker로 기한 지정 |
-| 마감기한 제거 | 기한 제거 버튼 제공 |
+| 마감기한 설정 / 제거 | datetime-local picker, D-day 뱃지 표시 |
 | 마감 초과 강조 | 기한 지난 투두는 주황색 배경으로 표시 |
+| 우선순위 | 높음 / 보통 / 낮음 + 색상 뱃지·정렬 |
+| 카테고리 | 유저가 만든 카테고리로 분류·필터 |
+| 반복 | 매일 / 매주 / 매월, 완료 시 다음 회차 자동 생성 |
+| 메모 | 항목별 상세 메모 |
+| 서브태스크 | 항목 안에 체크리스트(진행도 표시) |
+| 검색 / 정렬 | 제목 검색, 등록·마감·우선순위·가나다순 정렬 |
+| 드래그 정렬 | 등록순 모드에서 순서 직접 변경 |
+| 일괄 처리 | 전체 완료 / 완료 항목 삭제 |
 
 ### 🔔 알림
 | 기능 | 설명 |
@@ -65,6 +73,11 @@
 | 다크모드 | 라이트 / 다크 토글 (localStorage 저장) |
 | 필터 탭 | 전체 / 할 일 / 완료 / 마감초과 |
 | 타임라인 뷰 | 마감기한 기준 날짜별 그룹 시각화 |
+| 캘린더 뷰 | 월간 그리드에 마감일 표시, 날짜 클릭 시 목록 |
+| 통계바 | 완료율·진행바·남은 개수 |
+| 데이터 백업 | JSON 내보내기 / 가져오기 |
+| 계정 관리 | 비밀번호 변경 / 계정 삭제 |
+| PWA | 홈 화면 설치·오프라인(앱 셸 캐시) *HTTPS 호스팅 시 |
 | 반응형 | 모바일 / 데스크탑 대응 |
 | 엔터키 지원 | 모든 입력 폼에서 엔터로 제출 |
 
@@ -114,7 +127,18 @@ todolist
 ├── owner_id      (String, FK → users.user_id)
 ├── completed     (Boolean)
 ├── deadline      (DateTime, nullable)
-└── reminder_sent (Boolean)
+├── reminder_sent (Boolean)
+├── category      (String, nullable)
+├── repeat_cycle  (String, none/daily/weekly/monthly)
+├── priority      (Integer, 0=낮음/1=보통/2=높음)
+├── detail        (Text, nullable, 메모)
+└── sort_order    (Integer, nullable, 수동 정렬)
+
+subtasks
+├── id            (PK, Integer)
+├── todo_id       (Integer, FK → todolist.id)
+├── content       (Text)
+└── completed     (Boolean)
 
 email_verifications
 ├── email         (PK, String)
@@ -192,11 +216,23 @@ MAIL_FROM=noreply@yourdomain.com
 
 | Method | Endpoint | 설명 | 인증 필요 |
 |--------|----------|------|-----------|
-| `GET` | `/todos` | 내 투두 목록 조회 | ✅ |
+| `GET` | `/todos` | 내 투두 목록 조회 (서브태스크 포함) | ✅ |
 | `POST` | `/todos` | 투두 추가 | ✅ |
+| `PATCH` | `/todos/{id}` | 내용·카테고리·우선순위·반복·메모 수정 | ✅ |
 | `DELETE` | `/todos/{id}` | 투두 삭제 | ✅ |
-| `PATCH` | `/todos/{id}/toggle` | 완료 상태 토글 | ✅ |
+| `PATCH` | `/todos/{id}/toggle` | 완료 토글 (반복 시 다음 회차 생성) | ✅ |
 | `PATCH` | `/todos/{id}/deadline` | 마감기한 설정 / 제거 | ✅ |
+| `POST` | `/todos/reorder` | 순서 저장 (드래그 정렬) | ✅ |
+
+### 서브태스크 / 계정
+
+| Method | Endpoint | 설명 | 인증 필요 |
+|--------|----------|------|-----------|
+| `POST` | `/todos/{id}/subtasks` | 서브태스크 추가 | ✅ |
+| `PATCH` | `/subtasks/{sid}` | 서브태스크 토글 / 수정 | ✅ |
+| `DELETE` | `/subtasks/{sid}` | 서브태스크 삭제 | ✅ |
+| `POST` | `/change-password` | 비밀번호 변경 | ✅ |
+| `DELETE` | `/account` | 계정 삭제 | ✅ |
 
 > ✅ 인증 필요 엔드포인트는 `Authorization: Bearer <token>` 헤더 필요
 

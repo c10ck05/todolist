@@ -1,0 +1,18 @@
+{
+  "name": "Todo✓ 투두리스트",
+  "short_name": "Todo✓",
+  "description": "마감기한·카테고리·반복·캘린더까지 지원하는 투두리스트",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f2ef",
+  "theme_color": "#0a66c2",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -23,6 +23,9 @@ class TodoTable(Base):
     reminder_sent = Column(Boolean, default=False, nullable=False)
     category = Column(String(50), nullable=True)
     repeat_cycle = Column(String(20), default="none", nullable=False)
+    priority = Column(Integer, default=1, nullable=False)  # 0=낮음, 1=보통, 2=높음
+    detail = Column(Text, nullable=True)                   # 메모/상세
+    sort_order = Column(Integer, nullable=True)            # 수동 정렬용 (2단계)
 
 
 class UserTable(Base):
@@ -38,3 +41,11 @@ class EmailVerificationTable(Base):
     email = Column(String(100), primary_key=True)
     code = Column(String(6), nullable=False)
     expires_at = Column(DateTime, nullable=False)
+
+
+class SubtaskTable(Base):
+    __tablename__ = "subtasks"
+    id = Column(Integer, primary_key=True, index=True)
+    todo_id = Column(Integer, nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    completed = Column(Boolean, default=False, nullable=False)
