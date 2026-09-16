@@ -493,16 +493,11 @@ def check_deadlines():
     finally:
         db.close()
 
-
-def keep_alive():
-    try:
-        httpx.get("https://todolist-ezpr.onrender.com")
-        print("✅ Keep alive ping 성공")
-    except Exception:
-        pass
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 
 scheduler = BackgroundScheduler(timezone="Asia/Seoul")
 scheduler.add_job(check_deadlines, 'interval', minutes=30)
-scheduler.add_job(keep_alive, 'interval', minutes=10)
 scheduler.start()

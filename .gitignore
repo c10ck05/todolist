@@ -3,3 +3,8 @@ __pycache__/
 venv/
 .DS_Store
 *.pyc
+index.html
+manifest.json
+sw.js
+Todolist.png
+icon.svg
