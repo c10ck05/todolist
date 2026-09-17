@@ -35,18 +35,41 @@ def subtask_dict(s):
     return {"id": s.id, "content": s.content, "completed": s.completed}
 
 
-def add_interval(dt: datetime, cycle: str):
-    """마감일을 반복 주기만큼 뒤로 이동시킨 새 datetime을 반환. (반복 없음이면 None)"""
-    if cycle == "daily":
-        return dt + timedelta(days=1)
-    if cycle == "weekly":
-        return dt + timedelta(weeks=1)
-    if cycle == "monthly":
-        month = dt.month + 1
-        year = dt.year + (month - 1) // 12
-        month = (month - 1) % 12 + 1
-        day = min(dt.day, calendar.monthrange(year, month)[1])
-        return dt.replace(year=year, month=month, day=day)
+from datetime import datetime, timedelta
+
+def add_interval(current_deadline: datetime, repeat_cycle: dict):
+    if not repeat_cycle:
+        return None
+    
+    rtype = repeat_cycle.get("type")
+    
+    if rtype == "daily":
+        return current_deadline + timedelta(days=1)
+    elif rtype == "interval":
+        days_to_add = int(repeat_cycle.get("value", 1))
+        return current_deadline + timedelta(days=days_to_add)
+    elif rtype == "weekly":
+        target_days_str = repeat_cycle.get("days", [])
+        if not target_days_str:
+            return current_deadline + timedelta(days=7)
+            
+        day_map = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+        target_days = [day_map[d] for d in target_days_str if d in day_map]
+        
+        current_weekday = current_deadline.weekday()
+        
+        days_ahead_list = []
+        for t_day in target_days:
+            diff = (t_day - current_weekday) % 7
+            if diff == 0:
+                diff = 7
+            days_ahead_list.append(diff)
+            
+        return current_deadline + timedelta(days=min(days_ahead_list))
+        
+    elif rtype == "monthly":
+        return current_deadline + timedelta(days=30)
+        
     return None
 
 load_dotenv()
@@ -245,9 +268,7 @@ def create_todo(todo_data: dict, authorization: Annotated[str | None, Header()] 
     category = (todo_data.get("category") or None)
     if category:
         category = category.strip()[:50] or None
-    repeat = todo_data.get("repeat") or "none"
-    if repeat not in REPEAT_CYCLES:
-        repeat = "none"
+    repeat = todo_data.get("repeat") or {"type": "none"}
     priority = todo_data.get("priority", 1)
     if priority not in (0, 1, 2):
         priority = 1
@@ -286,7 +307,7 @@ def toggle_todo(id: int, authorization: Annotated[str | None, Header()] = None, 
     todo.completed = not todo.completed
     spawned = None
     # 반복 투두를 '완료'로 체크하면 다음 회차를 자동 생성
-    if todo.completed and todo.repeat_cycle != "none" and todo.deadline:
+    if todo.completed and todo.repeat_cycle.get("type") != "none" and todo.deadline:
         next_deadline = add_interval(todo.deadline, todo.repeat_cycle)
         if next_deadline:
             spawned = TodoTable(
@@ -321,8 +342,7 @@ def update_todo(id: int, data: dict, authorization: Annotated[str | None, Header
         category = data.get("category")
         todo.category = (category.strip()[:50] or None) if category else None
     if "repeat" in data:
-        repeat = data.get("repeat") or "none"
-        todo.repeat_cycle = repeat if repeat in REPEAT_CYCLES else "none"
+        todo.repeat_cycle = data.get("repeat") or {"type": "none"}
     if "priority" in data:
         p = data.get("priority")
         if p in (0, 1, 2):

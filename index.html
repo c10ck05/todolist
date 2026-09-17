@@ -1232,11 +1232,8 @@
     function fillDeadlineInput(id) {
         const todo = todos.find(t => t.id === id);
         const input = document.getElementById(`deadline-input-${id}`);
-        if (todo?.deadline && input) {
-            // 서버에서 받은 ISO 문자열을 로컬 시간으로 변환해서 input에 표시
-            const dt = new Date(todo.deadline);
-            input.value = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        }
+        if (todo?.deadline && input)
+            input.value = todo.deadline.slice(0, 16);
     }
 
     function toggleDeadlinePanel(id) {
