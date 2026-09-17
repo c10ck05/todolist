@@ -531,6 +531,287 @@
             .deadline-panel input[type="datetime-local"] { min-width: unset; width: 100%; }
         }
     </style>
+
+    <!-- ============================================================
+         Modern redesign (Toss / Apple style).
+         Appended after the original styles so equal-specificity rules
+         override them. All original class names & element IDs are kept
+         intact so every existing feature and JS handler keeps working.
+         ============================================================ -->
+    <style id="modern-redesign">
+        /* ---- Redefined design tokens ---- */
+        :root {
+            --bg: #f2f4f6;
+            --card-bg: #ffffff;
+            --text-primary: #191f28;
+            --text-secondary: #6b7684;
+            --input-border: #e5e8eb;
+            --input-border-focus: #3182f6;
+            --input-bg: #f7f8fa;
+            --btn-primary: #3182f6;
+            --btn-primary-hover: #1b64da;
+            --btn-primary-text: #ffffff;
+            --link-color: #3182f6;
+            --card-shadow: 0 1px 2px rgba(17,24,39,0.04), 0 12px 32px -8px rgba(17,24,39,0.10);
+            --divider: #eef0f2;
+            --alert-error-bg: #fef3f3;
+            --alert-error-color: #e5484d;
+            --alert-error-border: #fbdcdc;
+            --alert-success-bg: #eefaf3;
+            --alert-success-color: #12a150;
+            --alert-success-border: #cdeedb;
+            --todo-item-bg: #f9fafb;
+            --todo-item-border: #eef0f2;
+            --todo-item-hover: #f2f4f6;
+            --tab-active-bg: #3182f6;
+            --tab-border: #e5e8eb;
+            --logout-bg: #fef3f3;
+            --logout-color: #e5484d;
+            --logout-border: #fbdcdc;
+            --spinner-color: rgba(255,255,255,0.45);
+            --overdue-bg: #fff7ed;
+            --overdue-border: #fb923c;
+            --overdue-text: #c2410c;
+            --deadline-chip-bg: #eaf2ff;
+            --deadline-chip-color: #1b64da;
+            --deadline-picker-bg: #f7f9fc;
+            --timeline-line: #e5e8eb;
+            --timeline-dot: #3182f6;
+            --timeline-dot-overdue: #ef4444;
+            --timeline-dot-today: #f59e0b;
+            --timeline-dot-done: #12a150;
+            --focus-ring: 0 0 0 4px rgba(49,130,246,0.14);
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 12px;
+        }
+        [data-theme="dark"] {
+            --bg: #16181c;
+            --card-bg: #1f2227;
+            --text-primary: #f2f4f6;
+            --text-secondary: #9aa4af;
+            --input-border: #2c3036;
+            --input-border-focus: #4d93ff;
+            --input-bg: #26292e;
+            --btn-primary: #4d93ff;
+            --btn-primary-hover: #6aa6ff;
+            --btn-primary-text: #10131a;
+            --link-color: #6aa6ff;
+            --card-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 16px 40px -12px rgba(0,0,0,0.6);
+            --divider: #2c3036;
+            --alert-error-bg: #2f1a1c;
+            --alert-error-color: #ff8085;
+            --alert-error-border: #4a2529;
+            --alert-success-bg: #142e20;
+            --alert-success-color: #5cd196;
+            --alert-success-border: #24513a;
+            --todo-item-bg: #24272c;
+            --todo-item-border: #2c3036;
+            --todo-item-hover: #2b2f35;
+            --tab-active-bg: #4d93ff;
+            --tab-border: #2c3036;
+            --logout-bg: #2f1a1c;
+            --logout-color: #ff8085;
+            --logout-border: #4a2529;
+            --overdue-bg: #2a1c0e;
+            --overdue-border: #d97706;
+            --overdue-text: #fcd34d;
+            --deadline-chip-bg: #1a2c44;
+            --deadline-chip-color: #8ec0ff;
+            --deadline-picker-bg: #1c2026;
+            --timeline-line: #2c3036;
+            --timeline-dot: #4d93ff;
+            --focus-ring: 0 0 0 4px rgba(77,147,255,0.20);
+        }
+
+        /* ---- Base ---- */
+        body {
+            background:
+                radial-gradient(1200px 600px at 50% -10%, rgba(49,130,246,0.06), transparent 60%),
+                var(--bg);
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+            letter-spacing: -0.01em;
+        }
+
+        /* ---- Logo ---- */
+        .logo-text { font-weight: 800; letter-spacing: -1.5px; }
+        .logo-badge, .todo-logo-badge {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px -4px rgba(49,130,246,0.5);
+        }
+
+        /* ---- Cards ---- */
+        .card, .todo-container {
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--divider);
+            box-shadow: var(--card-shadow);
+            padding: 32px 30px 28px;
+        }
+        .card-title { font-weight: 800; letter-spacing: -0.8px; }
+        .card-subtitle { font-size: 15px; }
+
+        /* ---- Alerts ---- */
+        .alert { border-radius: 12px; padding: 12px 14px; font-weight: 500; }
+
+        /* ---- Inputs (filled, Toss style) ---- */
+        .input-wrap input,
+        .todo-input-row input,
+        .todo-category-input,
+        .search-input,
+        .sort-select,
+        .modal-input,
+        .edit-input,
+        .deadline-panel input[type="datetime-local"],
+        .deadline-panel input[type="text"],
+        .deadline-panel select,
+        .deadline-panel textarea,
+        .subtask-add-row input {
+            background: var(--input-bg);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+        }
+        .input-wrap input:focus,
+        .todo-input-row input:focus,
+        .todo-category-input:focus,
+        .search-input:focus,
+        .sort-select:focus,
+        .modal-input:focus,
+        .deadline-panel input[type="datetime-local"]:focus,
+        .deadline-panel input[type="text"]:focus,
+        .deadline-panel select:focus,
+        .deadline-panel textarea:focus,
+        .subtask-add-row input:focus {
+            background: var(--card-bg);
+            border-color: var(--input-border-focus);
+            box-shadow: var(--focus-ring);
+        }
+
+        /* ---- Buttons ---- */
+        .btn-main {
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            box-shadow: 0 8px 20px -8px rgba(49,130,246,0.55);
+            transition: transform 0.12s ease, background 0.18s, box-shadow 0.18s;
+        }
+        .btn-main:hover:not(:disabled) { transform: translateY(-1px); }
+        .btn-main:active:not(:disabled) { transform: translateY(0); }
+        .btn-add {
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            box-shadow: 0 6px 16px -8px rgba(49,130,246,0.55);
+            transition: transform 0.12s ease, background 0.18s;
+        }
+        .btn-add:hover:not(:disabled) { transform: translateY(-1px); }
+        .btn-verify { border-radius: var(--radius-sm); border-width: 1.5px; }
+        .btn-logout { border-radius: 999px; font-weight: 600; }
+
+        /* ---- Filter / category tabs (soft pill segmented look) ---- */
+        .tab-btn {
+            border: 1px solid transparent;
+            background: var(--todo-item-bg);
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-radius: 999px;
+            padding: 7px 16px;
+            transition: all 0.18s;
+        }
+        .tab-btn:hover:not(.active) { background: var(--todo-item-hover); color: var(--text-primary); }
+        .tab-btn.active {
+            background: var(--tab-active-bg);
+            color: var(--btn-primary-text);
+            box-shadow: 0 6px 16px -8px rgba(49,130,246,0.6);
+        }
+
+        /* ---- Todo items ---- */
+        .todo-list { gap: 10px; }
+        .todo-item {
+            border-radius: var(--radius-md);
+            border: 1px solid var(--todo-item-border);
+            transition: transform 0.15s ease, background 0.18s, border-color 0.18s, box-shadow 0.18s;
+        }
+        .todo-item:hover {
+            border-color: var(--divider);
+            box-shadow: 0 6px 18px -10px rgba(17,24,39,0.18);
+            transform: translateY(-1px);
+        }
+        .todo-checkbox { border-radius: 7px; transition: all 0.15s; }
+        .todo-item-main { padding: 14px 16px; }
+
+        /* ---- Chips & badges ---- */
+        .deadline-chip, .category-badge, .priority-badge, .dday-badge {
+            border-radius: 999px;
+            font-weight: 700;
+            letter-spacing: 0.1px;
+        }
+
+        /* ---- Action buttons on item ---- */
+        .btn-deadline, .btn-delete {
+            border-radius: 9px;
+            transition: all 0.18s;
+        }
+        .btn-settings { border-radius: 10px; transition: all 0.18s; }
+
+        /* ---- Deadline / detail panel ---- */
+        .deadline-panel {
+            background: var(--deadline-picker-bg);
+            padding: 14px 16px 16px;
+        }
+        .btn-deadline-save { border-radius: 10px; font-weight: 700; }
+        .btn-deadline-remove { border-radius: 10px; }
+
+        /* ---- List tools ---- */
+        .search-input, .sort-select { border-radius: var(--radius-sm); }
+
+        /* ---- Stats bar ---- */
+        .stats-bar {
+            border-radius: var(--radius-md);
+            background: var(--todo-item-bg);
+            border-color: var(--todo-item-border);
+        }
+        .progress-track { height: 8px; }
+        .stats-btn { border-radius: 9px; }
+
+        /* ---- Calendar ---- */
+        .cal-cell { border-radius: 10px; transition: all 0.15s; }
+        .cal-nav button { border-radius: 10px; }
+
+        /* ---- Timeline ---- */
+        .timeline-card {
+            border-radius: var(--radius-md);
+            transition: transform 0.15s ease, background 0.18s;
+        }
+        .timeline-card:hover { transform: translateX(2px); }
+
+        /* ---- Modal ---- */
+        .modal-overlay { backdrop-filter: blur(6px); background: rgba(17,24,39,0.42); }
+        .modal-card {
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--divider);
+            padding: 26px 24px;
+        }
+        .modal-btn { border-radius: var(--radius-sm); font-weight: 600; }
+        .modal-btn.primary {
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 20px -8px rgba(49,130,246,0.55);
+        }
+        .modal-btn.danger { border-radius: var(--radius-md); }
+
+        /* ---- Theme toggle ---- */
+        .theme-toggle {
+            border: 1px solid var(--divider);
+            box-shadow: 0 6px 20px -8px rgba(17,24,39,0.25);
+        }
+
+        /* ---- Subtasks ---- */
+        .subtask-check { border-radius: 6px; }
+        .subtask-add-row button { border-radius: 9px; font-weight: 700; }
+
+        /* ---- Softer entrance animation ---- */
+        @keyframes fadeIn { from { opacity:0; transform:translateY(8px) scale(0.995); } to { opacity:1; transform:translateY(0) scale(1); } }
+    </style>
 </head>
 <body>
 <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</button>

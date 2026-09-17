@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import JSON
 
 load_dotenv()
 
@@ -22,7 +23,7 @@ class TodoTable(Base):
     deadline = Column(DateTime, nullable=True)
     reminder_sent = Column(Boolean, default=False, nullable=False)
     category = Column(String(50), nullable=True)
-    repeat_cycle = Column(String(20), default="none", nullable=False)
+    repeat_cycle = Column(JSON, default="none", nullable=False)
     priority = Column(Integer, default=1, nullable=False)  # 0=낮음, 1=보통, 2=높음
     detail = Column(Text, nullable=True)                   # 메모/상세
     sort_order = Column(Integer, nullable=True)            # 수동 정렬용 (2단계)
