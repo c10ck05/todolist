@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user_id, get_db
 from backend.models import SubtaskTable, TodoTable
-from backend.utils.todos import add_interval, subtask_dict, todo_dict
+from backend.utils.todos import add_interval, normalize_repeat, subtask_dict, todo_dict
 
 
 router = APIRouter()
@@ -51,7 +51,7 @@ def create_todo(
     category = todo_data.get("category") or None
     if category:
         category = category.strip()[:50] or None
-    repeat = todo_data.get("repeat") or {"type": "none"}
+    repeat = normalize_repeat(todo_data.get("repeat"))
     priority = todo_data.get("priority", 1)
     if priority not in (0, 1, 2):
         priority = 1
@@ -98,7 +98,7 @@ def toggle_todo(
     todo = get_owned_todo(id, user_id, db)
     todo.completed = not todo.completed
     spawned = None
-    if todo.completed and todo.repeat_cycle.get("type") != "none" and todo.deadline:
+    if todo.completed and todo.deadline:
         next_deadline = add_interval(todo.deadline, todo.repeat_cycle)
         if next_deadline:
             spawned = TodoTable(
@@ -139,7 +139,7 @@ def update_todo(
         category = data.get("category")
         todo.category = (category.strip()[:50] or None) if category else None
     if "repeat" in data:
-        todo.repeat_cycle = data.get("repeat") or {"type": "none"}
+        todo.repeat_cycle = normalize_repeat(data.get("repeat"))
     if "priority" in data:
         priority = data.get("priority")
         if priority in (0, 1, 2):

@@ -2,6 +2,34 @@
 
 from datetime import datetime, timedelta
 
+from fastapi import HTTPException
+
+
+def normalize_repeat(value):
+    """Accept legacy strings and validate structured repeat settings."""
+    if not value:
+        return {"type": "none"}
+    if isinstance(value, str):
+        value = {"type": value}
+    if not isinstance(value, dict):
+        raise HTTPException(status_code=400, detail="반복 설정이 올바르지 않습니다.")
+    repeat_type = value.get("type", "none")
+    if repeat_type not in ("none", "daily", "weekly", "monthly", "interval"):
+        raise HTTPException(status_code=400, detail="지원하지 않는 반복 주기입니다.")
+    result = {"type": repeat_type}
+    if repeat_type == "weekly":
+        days = value.get("days", [])
+        weekdays = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        if not isinstance(days, list) or any(day not in weekdays for day in days):
+            raise HTTPException(status_code=400, detail="반복 요일이 올바르지 않습니다.")
+        result["days"] = [day for day in weekdays if day in days]
+    if repeat_type == "interval":
+        days = value.get("value", 1)
+        if isinstance(days, bool) or not isinstance(days, int) or days < 1:
+            raise HTTPException(status_code=400, detail="반복 간격은 1 이상의 정수여야 합니다.")
+        result["value"] = days
+    return result
+
 
 def todo_dict(todo, subtasks=None):
     return {
@@ -23,6 +51,7 @@ def subtask_dict(subtask):
 
 
 def add_interval(current_deadline: datetime, repeat_cycle: dict):
+    repeat_cycle = normalize_repeat(repeat_cycle)
     if not repeat_cycle:
         return None
 

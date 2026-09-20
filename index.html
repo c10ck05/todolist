@@ -288,6 +288,15 @@
             background: var(--tab-active-bg); color: var(--btn-primary-text);
         }
         .repeat-icon { font-size: 11px; margin-left: 4px; opacity: 0.75; }
+        .repeat-editor { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; }
+        .repeat-editor small { width: 100%; color: var(--text-secondary); line-height: 1.5; }
+        .repeat-days { display: flex; flex-wrap: wrap; gap: 6px; }
+        .repeat-days[hidden] { display: none; }
+        .repeat-day { cursor: pointer; }
+        .repeat-day input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+        .repeat-day span { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--input-border); border-radius: 50%; background: var(--input-bg); }
+        .repeat-day input:checked + span { background: var(--btn-primary); color: var(--btn-primary-text); border-color: var(--btn-primary); }
+        .repeat-day input:focus-visible + span { outline: 2px solid var(--input-border-focus); outline-offset: 2px; }
         .deadline-panel input[type="text"], .deadline-panel select {
             padding: 7px 10px;
             border: 1px solid var(--input-border);
@@ -761,6 +770,23 @@
         }
         .btn-deadline-save { border-radius: 10px; font-weight: 700; }
         .btn-deadline-remove { border-radius: 10px; }
+        .btn-deadline { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 32px; }
+        .btn-deadline svg { width: 18px; height: 18px; }
+        .deadline-panel.open { display: block; }
+        .detail-section { padding: 16px 0; border-bottom: 1px solid var(--divider); }
+        .detail-section:first-child { padding-top: 2px; }
+        .detail-section:last-child { border-bottom: 0; padding-bottom: 0; }
+        .detail-section-title { display: block; margin-bottom: 10px; font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+        .detail-basic { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+        .detail-field { min-width: 0; }
+        .detail-field > label { display: block; margin-bottom: 8px; }
+        .deadline-panel .detail-field input, .deadline-panel .detail-field select { width: 100%; min-width: 0; box-sizing: border-box; }
+        .detail-deadline-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .deadline-panel .detail-deadline-row input { min-width: 0; flex: 1 1 180px; }
+        .deadline-panel .detail-section input:not([type="checkbox"]), .deadline-panel .detail-section select, .deadline-panel .detail-section textarea { border: 1px solid var(--input-border); border-radius: 10px; padding: 10px 12px; }
+        .deadline-panel .detail-section textarea { display: block; min-height: 80px; box-sizing: border-box; }
+        .repeat-editor input[type="number"] { width: 90px; }
+        @media (max-width: 540px) { .detail-basic { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
 
         /* ---- List tools ---- */
         .search-input, .sort-select { border-radius: var(--radius-sm); }
@@ -895,7 +921,6 @@
         <div class="todo-input-row">
             <input type="text" id="todo-input" placeholder="할 일을 입력하세요...">
             <input type="text" id="todo-category" class="todo-category-input" placeholder="카테고리(선택)" list="category-list">
-            <input type="datetime-local" id="todo-deadline" aria-label="마감기한 (선택)" title="마감기한 (선택)">
             <button class="btn-add" id="btn-add-todo" onclick="addTodo()">+ 등록</button>
         </div>
         <datalist id="category-list"></datalist>
@@ -969,7 +994,7 @@
     let calendarDate = new Date();
     let selectedCalKey = null;
     const openPanels = new Set(); // 열려있는 상세 패널 id (재렌더 후에도 유지)
-    const REPEAT_LABELS = { none: '', daily: '매일', weekly: '매주', monthly: '매월' };
+    const REPEAT_LABELS = { none: '', daily: '매일', weekly: '매주', monthly: '매월', interval: '일 간격' };
 
     // =====================
     // 다크모드
@@ -1153,13 +1178,11 @@
     async function addTodo() {
         const input = document.getElementById('todo-input');
         const catInput = document.getElementById('todo-category');
-        const deadlineInput = document.getElementById('todo-deadline');
 
         const content = input.value.trim();
         if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
 
         const category = catInput.value.trim() || null;
-        const deadline = deadlineInput.value || null;
 
         const btn = document.getElementById('btn-add-todo');
         if (btn.disabled) return;
@@ -1171,7 +1194,7 @@
             const res = await fetch(`${API_BASE}/todos`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ content, category, deadline })
+                body: JSON.stringify({ content, category })
             });
 
             if (res.status === 401) { logout(); return; }
@@ -1181,7 +1204,6 @@
 
             input.value = '';
             catInput.value = '';
-            deadlineInput.value = '';
 
             render();
         } catch (e) {
@@ -1208,7 +1230,21 @@
         } catch (e) { console.error(e); }
     }
     function updateCategory(id, value) { updateTodoField(id, { category: value.trim() || null }); }
-    function updateRepeat(id, value) { updateTodoField(id, { repeat: value }); }
+    function changeRepeatType(id, value) {
+        document.getElementById(`repeat-days-${id}`).hidden = value !== 'weekly';
+        document.getElementById(`repeat-interval-${id}`).hidden = value !== 'interval';
+    }
+    async function saveRepeat(id) {
+        const type = document.getElementById(`repeat-input-${id}`).value;
+        const days = Array.from(document.querySelectorAll(`#repeat-days-${id} input:checked`), el => el.value);
+        if (type === 'weekly' && !days.length) { alert('반복할 요일을 하나 이상 선택해주세요.'); return; }
+        const repeat = type === 'weekly' ? { type, days } : { type };
+        if (type === 'interval') {
+            repeat.value = Number(document.getElementById(`repeat-interval-${id}`).value);
+            if (!Number.isInteger(repeat.value) || repeat.value < 1) { alert('반복 간격은 1 이상의 정수로 입력해주세요.'); return; }
+        }
+        await updateTodoField(id, { repeat });
+    }
     function updatePriority(id, value) { updateTodoField(id, { priority: parseInt(value, 10) }); }
     function updateDetail(id, value) { updateTodoField(id, { detail: value.trim() || null }); }
 
@@ -1261,13 +1297,13 @@
     // 재렌더 후에도 열려있던 패널 상태를 복원
     function applyOpenPanels() {
         document.querySelectorAll('.deadline-panel').forEach(p => p.classList.remove('open'));
-        document.querySelectorAll('.btn-deadline').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.btn-deadline').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded', 'false'); });
         openPanels.forEach(id => {
             const panel = document.getElementById(`deadline-panel-${id}`);
             const btn = document.getElementById(`btn-deadline-${id}`);
             if (!panel) { openPanels.delete(id); return; }
             panel.classList.add('open');
-            if (btn) btn.classList.add('active');
+            if (btn) { btn.classList.add('active'); btn.setAttribute('aria-expanded', 'true'); }
             fillDeadlineInput(id);
         });
     }
@@ -1596,9 +1632,33 @@
     }
 
     function repeatOptions(selected) {
+        selected = typeof selected === 'string' ? selected : (selected?.type || 'none');
         return Object.entries(REPEAT_LABELS).map(([val, label]) =>
             `<option value="${val}" ${val === (selected || 'none') ? 'selected' : ''}>${val === 'none' ? '없음' : label}</option>`
         ).join('');
+    }
+
+    const WEEKDAYS = { mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일' };
+    function repeatLabel(value) {
+        const repeat = typeof value === 'string' ? { type: value } : (value || { type: 'none' });
+        if (repeat.type === 'weekly' && repeat.days?.length) {
+            return `매주 ${repeat.days.map(day => WEEKDAYS[day]).filter(Boolean).join('·')}`;
+        }
+        if (repeat.type === 'interval') return `${repeat.value}일마다`;
+        return REPEAT_LABELS[repeat.type] || '';
+    }
+    function repeatEditor(todo) {
+        const repeat = typeof todo.repeat === 'string' ? { type: todo.repeat } : (todo.repeat || { type: 'none' });
+        const days = repeat.days || [];
+        return `<div class="repeat-editor">
+            <select id="repeat-input-${todo.id}" aria-label="반복 주기" onchange="changeRepeatType(${todo.id}, this.value)">${repeatOptions(repeat)}</select>
+            <input type="number" min="1" step="1" id="repeat-interval-${todo.id}" aria-label="반복 간격 (일)" value="${Number.isInteger(repeat.value) ? repeat.value : 1}" ${repeat.type === 'interval' ? '' : 'hidden'}>
+            <div class="repeat-days" id="repeat-days-${todo.id}" ${repeat.type === 'weekly' ? '' : 'hidden'}>
+                ${Object.entries(WEEKDAYS).map(([day, label]) => `<label class="repeat-day"><input type="checkbox" value="${day}" ${days.includes(day) ? 'checked' : ''}><span>${label}</span></label>`).join('')}
+            </div>
+            <button class="btn-deadline-save" onclick="saveRepeat(${todo.id})">반복 저장</button>
+            <small>마감기한을 설정하면 완료 시 다음 반복 일정이 생성됩니다.</small>
+        </div>`;
     }
 
     // 카테고리 필터 칩 + 입력 자동완성(datalist) 갱신
@@ -1651,7 +1711,7 @@
                 ? `<span class="deadline-chip ${overdue ? 'overdue' : ''}">${formatDeadline(t.deadline)}</span>`
                 : '';
             const catHtml = t.category ? `<span class="category-badge">🏷 ${escapeHtml(t.category)}</span>` : '';
-            const repeatHtml = (t.repeat && t.repeat !== 'none') ? `<span class="repeat-icon">🔁 ${REPEAT_LABELS[t.repeat]}</span>` : '';
+            const repeatHtml = repeatLabel(t.repeat) ? `<span class="repeat-icon">🔁 ${escapeHtml(repeatLabel(t.repeat))}</span>` : '';
             const memoHtml = t.detail ? `<span class="memo-icon" title="${escapeHtml(t.detail)}">📝</span>` : '';
             const dragAttrs = dragEnabled
                 ? `draggable="true" ondragstart="onDragStart(event, ${t.id})" ondragend="onDragEnd(event)" ondragover="onDragOver(event, ${t.id})" ondragenter="onDragEnter(event, ${t.id})" ondragleave="onDragLeave(event)" ondrop="onDrop(event, ${t.id})"`
@@ -1667,23 +1727,38 @@
                         ${chipHtml}${ddayBadge(t.deadline, t.completed)}${priorityBadge(t.priority)}${catHtml}
                     </div>
                     <div class="todo-actions">
-                        <button class="btn-deadline ${t.deadline ? 'active' : ''}" id="btn-deadline-${t.id}" onclick="toggleDeadlinePanel(${t.id})">📅</button>
+                        <button class="btn-deadline" id="btn-deadline-${t.id}" title="세부 설정" aria-label="세부 설정" aria-controls="deadline-panel-${t.id}" aria-expanded="false" onclick="toggleDeadlinePanel(${t.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></button>
                         <button class="btn-delete" onclick="deleteTodo(${t.id})">삭제</button>
                     </div>
                 </div>
                 <div class="deadline-panel" id="deadline-panel-${t.id}">
-                    <label>카테고리</label>
+                    <div class="detail-section detail-basic">
+                    <div class="detail-field">
+                    <label for="category-input-${t.id}">카테고리</label>
                     <input type="text" list="category-list" id="category-input-${t.id}" value="${escapeHtml(t.category || '')}" placeholder="없음" onchange="updateCategory(${t.id}, this.value)">
-                    <label>우선순위</label>
+                    </div><div class="detail-field">
+                    <label for="priority-input-${t.id}">우선순위</label>
                     <select id="priority-input-${t.id}" onchange="updatePriority(${t.id}, this.value)">${priorityOptions(t.priority)}</select>
-                    <label>반복</label>
-                    <select id="repeat-input-${t.id}" onchange="updateRepeat(${t.id}, this.value)">${repeatOptions(t.repeat)}</select>
-                    <label>마감기한</label>
+                    </div></div>
+                    <div class="detail-section">
+                    <label class="detail-section-title" for="repeat-input-${t.id}">반복 일정</label>
+                    ${repeatEditor(t)}
+                    </div>
+                    <div class="detail-section">
+                    <label class="detail-section-title" for="deadline-input-${t.id}">마감기한</label>
+                    <div class="detail-deadline-row">
                     <input type="datetime-local" id="deadline-input-${t.id}">
                     <button class="btn-deadline-save" onclick="saveDeadline(${t.id})">저장</button>
                     ${t.deadline ? `<button class="btn-deadline-remove" onclick="removeDeadline(${t.id})">제거</button>` : ''}
+                    </div></div>
+                    <div class="detail-section">
+                    <label class="detail-section-title" for="detail-input-${t.id}">메모 · 자동 저장</label>
                     <textarea id="detail-input-${t.id}" placeholder="메모 (자동 저장)" onchange="updateDetail(${t.id}, this.value)">${escapeHtml(t.detail || '')}</textarea>
+                    </div>
+                    <div class="detail-section">
+                    <div class="detail-section-title">체크리스트</div>
                     ${subtaskSection(t)}
+                    </div>
                 </div>
             </li>`;
         }).join('');
@@ -1699,7 +1774,7 @@
             .filter(t => t.deadline)
             .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
         if (todosWithDeadline.length === 0) {
-            view.innerHTML = `<div class="timeline-empty"><div class="emoji">📅</div><p>마감기한이 설정된 할 일이 없어요!<br>투두에 📅 버튼으로 마감기한을 추가해보세요.</p></div>`;
+            view.innerHTML = `<div class="timeline-empty"><div class="emoji">📅</div><p>마감기한이 설정된 할 일이 없어요!<br>할 일의 세부 설정 버튼으로 마감기한을 추가해보세요.</p></div>`;
             return;
         }
         const now = new Date();
