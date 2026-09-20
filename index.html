@@ -290,11 +290,8 @@
         .repeat-icon { font-size: 11px; margin-left: 4px; opacity: 0.75; }
         .repeat-editor { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; }
         .repeat-editor small { width: 100%; color: var(--text-secondary); line-height: 1.5; }
-        .repeat-presets { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
-        .repeat-presets button { padding: 7px 11px; border: 1px solid var(--input-border); border-radius: 8px; background: var(--card-bg); color: var(--text-primary); cursor: pointer; }
-        .repeat-presets button:hover { border-color: var(--btn-primary); color: var(--link-color); }
-        .repeat-advanced { width: 100%; color: var(--text-secondary); font-size: 12px; }
-        .repeat-advanced summary { cursor: pointer; margin: 6px 0 10px; }
+        .repeat-custom { width: 100%; padding: 10px 0; }
+        .repeat-custom[hidden] { display: none; }
         .repeat-days { display: flex; flex-wrap: wrap; gap: 6px; }
         .repeat-days[hidden] { display: none; }
         .repeat-day { cursor: pointer; }
@@ -1237,22 +1234,13 @@
     function updateCategory(id, value) { updateTodoField(id, { category: value.trim() || null }); }
     function changeRepeatType(id, value) {
         document.getElementById(`repeat-interval-${id}`).hidden = value !== 'interval';
-        if (value !== 'weekly') document.querySelectorAll(`#repeat-days-${id} input`).forEach(el => el.checked = value === 'daily');
-    }
-    function chooseRepeatDays(id, days) {
-        document.getElementById(`repeat-input-${id}`).value = days.length ? 'weekly' : 'none';
-        document.getElementById(`repeat-interval-${id}`).hidden = true;
-        document.querySelectorAll(`#repeat-days-${id} input`).forEach(el => el.checked = days.includes(el.value));
-    }
-    function changeRepeatDay(id) {
-        const days = Array.from(document.querySelectorAll(`#repeat-days-${id} input:checked`), el => el.value);
-        chooseRepeatDays(id, days);
+        document.getElementById(`repeat-custom-${id}`).hidden = value !== 'custom';
     }
     async function saveRepeat(id) {
         const type = document.getElementById(`repeat-input-${id}`).value;
         const days = Array.from(document.querySelectorAll(`#repeat-days-${id} input:checked`), el => el.value);
-        if (type === 'weekly' && !days.length) { alert('반복할 요일을 하나 이상 선택해주세요.'); return; }
-        const repeat = type === 'weekly' ? { type, days } : { type };
+        if (type === 'custom' && !days.length) { alert('반복할 요일을 하나 이상 선택해주세요.'); return; }
+        const repeat = type === 'custom' ? { type: 'weekly', days } : { type };
         if (type === 'interval') {
             repeat.value = Number(document.getElementById(`repeat-interval-${id}`).value);
             if (!Number.isInteger(repeat.value) || repeat.value < 1) { alert('반복 간격은 1 이상의 정수로 입력해주세요.'); return; }
@@ -1646,8 +1634,8 @@
     }
 
     function repeatOptions(selected) {
-        selected = typeof selected === 'string' ? selected : (selected?.type || 'none');
-        return Object.entries(REPEAT_LABELS).map(([val, label]) =>
+        selected = selected?.type === 'weekly' && selected.days?.length ? 'custom' : (typeof selected === 'string' ? selected : (selected?.type || 'none'));
+        return Object.entries({ ...REPEAT_LABELS, custom: '사용자 설정' }).map(([val, label]) =>
             `<option value="${val}" ${val === (selected || 'none') ? 'selected' : ''}>${val === 'none' ? '없음' : label}</option>`
         ).join('');
     }
@@ -1663,23 +1651,16 @@
     }
     function repeatEditor(todo) {
         const repeat = typeof todo.repeat === 'string' ? { type: todo.repeat } : (todo.repeat || { type: 'none' });
-        const days = repeat.type === 'daily' ? Object.keys(WEEKDAYS) : (repeat.days || []);
+        const days = repeat.days || [];
         return `<div class="repeat-editor">
-            <div class="repeat-presets">
-                <button type="button" onclick="chooseRepeatDays(${todo.id}, [])">반복 안 함</button>
-                <button type="button" onclick="chooseRepeatDays(${todo.id}, ['mon','tue','wed','thu','fri','sat','sun'])">매일</button>
-                <button type="button" onclick="chooseRepeatDays(${todo.id}, ['mon','tue','wed','thu','fri'])">평일</button>
-                <button type="button" onclick="chooseRepeatDays(${todo.id}, ['mon','wed','fri'])">월·수·금</button>
-            </div>
-            <small>반복할 요일을 누르세요. 여러 개 선택할 수 있어요.</small>
-            <div class="repeat-days" id="repeat-days-${todo.id}">
-                ${Object.entries(WEEKDAYS).map(([day, label]) => `<label class="repeat-day"><input type="checkbox" value="${day}" onchange="changeRepeatDay(${todo.id})" ${days.includes(day) ? 'checked' : ''}><span>${label}</span></label>`).join('')}
-            </div>
-            <details class="repeat-advanced" ${['monthly', 'interval'].includes(repeat.type) ? 'open' : ''}>
-            <summary>다른 반복 주기</summary>
             <select id="repeat-input-${todo.id}" aria-label="반복 주기" onchange="changeRepeatType(${todo.id}, this.value)">${repeatOptions(repeat)}</select>
             <input type="number" min="1" step="1" id="repeat-interval-${todo.id}" aria-label="반복 간격 (일)" value="${Number.isInteger(repeat.value) ? repeat.value : 1}" ${repeat.type === 'interval' ? '' : 'hidden'}>
-            </details>
+            <div class="repeat-custom" id="repeat-custom-${todo.id}" ${repeat.type === 'weekly' && days.length ? '' : 'hidden'}>
+                <div class="detail-section-title">반복할 요일을 선택하세요</div>
+                <div class="repeat-days" id="repeat-days-${todo.id}">
+                    ${Object.entries(WEEKDAYS).map(([day, label]) => `<label class="repeat-day"><input type="checkbox" value="${day}" ${days.includes(day) ? 'checked' : ''}><span>${label}</span></label>`).join('')}
+                </div>
+            </div>
             <button class="btn-deadline-save" onclick="saveRepeat(${todo.id})">반복 저장</button>
             <small>마감기한을 설정하면 완료 시 다음 반복 일정이 생성됩니다.</small>
         </div>`;
