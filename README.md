@@ -106,8 +106,17 @@
 
 ```
 todo-app/
-├── main.py          # FastAPI 앱 / API 라우터
-├── database.py      # SQLAlchemy 모델 / DB 연결
+├── main.py          # ASGI 진입점 (uvicorn main:app 호환 유지)
+├── database.py      # 기존 외부 스크립트용 호환 import
+├── backend/
+│   ├── app.py       # FastAPI 조립, CORS, 라우터, 수명주기
+│   ├── config.py    # 환경 변수 설정
+│   ├── database.py  # SQLAlchemy 엔진 / 세션
+│   ├── models.py    # SQLAlchemy 테이블 모델
+│   ├── dependencies.py # DB / 인증 의존성
+│   ├── routers/     # 인증, 투두, 서브태스크, 계정, 헬스체크 API
+│   ├── services/    # Resend 이메일, 마감 리마인더 스케줄러
+│   └── utils/       # 투두 직렬화, 반복 기한 계산
 ├── requirements.txt # Python 패키지 목록
 └── index.html       # 프론트엔드 (단일 HTML 파일)
 ```
@@ -174,6 +183,11 @@ pip install -r requirements.txt
 ```bash
 uvicorn main:app --reload
 ```
+
+`main.py`는 호환용 진입점으로 유지했으므로, Render의 기존 Start Command가
+`uvicorn main:app ...` 형태라면 변경할 필요가 없습니다. 코드 변경을 서비스에
+반영하려면 기존 Render 서비스는 다시 배포해야 합니다. GitHub 자동 배포를 켜둔
+경우에는 기본 브랜치에 푸시하면 자동으로 배포됩니다.
 
 ### 5. 프론트엔드 접속
 

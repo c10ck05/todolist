@@ -895,6 +895,7 @@
         <div class="todo-input-row">
             <input type="text" id="todo-input" placeholder="할 일을 입력하세요...">
             <input type="text" id="todo-category" class="todo-category-input" placeholder="카테고리(선택)" list="category-list">
+            <input type="datetime-local" id="todo-deadline" aria-label="마감기한 (선택)" title="마감기한 (선택)">
             <button class="btn-add" id="btn-add-todo" onclick="addTodo()">+ 등록</button>
         </div>
         <datalist id="category-list"></datalist>
@@ -1152,27 +1153,42 @@
     async function addTodo() {
         const input = document.getElementById('todo-input');
         const catInput = document.getElementById('todo-category');
+        const deadlineInput = document.getElementById('todo-deadline');
+
         const content = input.value.trim();
         if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
+
         const category = catInput.value.trim() || null;
+        const deadline = deadlineInput.value || null;
+
         const btn = document.getElementById('btn-add-todo');
         if (btn.disabled) return;
         btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+
         const token = localStorage.getItem('token');
+
         try {
             const res = await fetch(`${API_BASE}/todos`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ content, category })
+                body: JSON.stringify({ content, category, deadline })
             });
+
             if (res.status === 401) { logout(); return; }
+
             const newTodo = await res.json();
             todos.push(newTodo);
+
             input.value = '';
             catInput.value = '';
+            deadlineInput.value = '';
+
             render();
-        } catch (e) { console.error(e); }
-        finally { btn.disabled = false; btn.innerHTML = '+ 등록'; }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            btn.disabled = false; btn.innerHTML = '+ 등록';
+        }
     }
 
     // 카테고리 / 반복 수정 (PATCH /todos/{id})
