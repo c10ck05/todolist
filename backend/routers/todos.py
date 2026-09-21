@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user_id, get_db
-from backend.schemas import TodoCreate, TodoUpdate, DeadlineRequest, ReorderRequest
+from backend.schemas import TodoCreate, TodoUpdate, DeadlineRequest, ReorderRequest, BackupImport
 from backend.models import SubtaskTable, TodoTable, TodoRecurrenceTable
 from backend.utils.todos import add_interval, normalize_repeat, subtask_dict, todo_dict
 
@@ -52,6 +52,8 @@ def create_todo(
     if category:
         category = category.strip()[:50] or None
     repeat = normalize_repeat(todo_data.get("repeat"))
+    if deadline:
+        add_interval(deadline, repeat)
     priority = todo_data.get("priority", 1)
     if priority not in (0, 1, 2):
         priority = 1
@@ -69,6 +71,38 @@ def create_todo(
     db.commit()
     db.refresh(new_todo)
     return todo_dict(new_todo)
+
+
+@router.post("/todos/import")
+def import_todos(
+    data: BackupImport,
+    authorization: Annotated[str | None, Header()] = None,
+    db: Session = Depends(get_db),
+):
+    """Append a complete backup atomically, assigning fresh owned IDs."""
+    user_id = get_current_user_id(authorization)
+    items = sorted(data.items, key=lambda item: (item.sort_order is None, item.sort_order or 0))
+    for item in items:
+        if item.deadline:
+            add_interval(item.deadline, item.repeat)
+    existing = db.query(TodoTable).filter(TodoTable.owner_id == user_id).order_by(
+        TodoTable.sort_order.is_(None), TodoTable.sort_order, TodoTable.id
+    ).all()
+    # Preserve the visible order of existing items and append the restored group.
+    for index, todo in enumerate(existing):
+        todo.sort_order = index
+    for index, item in enumerate(items, start=len(existing)):
+        todo = TodoTable(todo=item.content, owner_id=user_id, deadline=item.deadline,
+                         category=(item.category or '').strip() or None,
+                         repeat_cycle=normalize_repeat(item.repeat), priority=item.priority,
+                         detail=item.detail, completed=item.completed, sort_order=index,
+                         reminder_sent=False)
+        db.add(todo)
+        db.flush()
+        for child in item.subtasks:
+            db.add(SubtaskTable(todo_id=todo.id, content=child.content, completed=child.completed))
+    db.commit()
+    return {'imported': len(items)}
 
 
 @router.delete("/todos/{id}")
@@ -139,6 +173,8 @@ def update_todo(
     user_id = get_current_user_id(authorization)
     todo = get_owned_todo(id, user_id, db)
     data = data.model_dump(exclude_unset=True)
+    if todo.deadline and 'repeat' in data:
+        add_interval(todo.deadline, data['repeat'])
     if "content" in data:
         content = (data.get("content") or "").strip()
         if not content:
@@ -170,6 +206,8 @@ def update_deadline(
 ):
     user_id = get_current_user_id(authorization)
     todo = get_owned_todo(id, user_id, db)
+    if data.deadline:
+        add_interval(data.deadline, todo.repeat_cycle)
     todo.deadline = data.deadline
     todo.reminder_sent = False
     db.commit()

@@ -55,7 +55,10 @@ def deadline_input(value):
 
 def local_deadline(value):
     if value is not None and value.tzinfo is not None:
-        return value.astimezone(KST).replace(tzinfo=None)
+        try:
+            return value.astimezone(KST).replace(tzinfo=None)
+        except (OverflowError, ValueError):
+            raise ValueError('마감일이 지원 범위를 벗어납니다.')
     return value
 
 
@@ -133,3 +136,19 @@ class SubtaskCreate(InputModel):
 class SubtaskUpdate(InputModel):
     content: Content = None
     completed: Annotated[bool, Field(strict=True)] = None
+
+
+class BackupSubtask(SubtaskCreate):
+    id: Annotated[int, Field(strict=True, gt=0)] | None = None
+    completed: Annotated[bool, Field(strict=True)] = False
+
+
+class BackupTodo(TodoCreate):
+    id: Annotated[int, Field(strict=True, gt=0)] | None = None
+    completed: Annotated[bool, Field(strict=True)] = False
+    sort_order: Annotated[int, Field(strict=True, ge=0)] | None = None
+    subtasks: list[BackupSubtask] = Field(default_factory=list, max_length=1000)
+
+
+class BackupImport(InputModel):
+    items: list[BackupTodo] = Field(min_length=1, max_length=1000)

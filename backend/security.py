@@ -49,6 +49,6 @@ def auth_limit(request: Request, identity: str, action: str):
     consume_limit(f'{action}:ip', ip, 30, 900)
     # Lowercase only for limiting, to prevent bypassing by email casing.
     consume_limit(f'{action}:account', identity.strip().casefold(),
-                  {'send': 3, 'verify': 5, 'login': 10}[action], 900)
+                  {'send': 3, 'verify': 5, 'login': 10, 'password_check': 10}[action], 900)
     if action == 'send':
         consume_limit('send:cooldown', identity.strip().casefold(), 1, 60)

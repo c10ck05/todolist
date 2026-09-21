@@ -1265,6 +1265,18 @@
         }
     }
 
+    const todoSaveQueues = new Map();
+    function queueTodoSave(id, token, save) {
+        const previous = todoSaveQueues.get(id) || Promise.resolve();
+        const next = previous.catch(() => {}).then(() => {
+            if (localStorage.getItem('token') === token) return save();
+        });
+        todoSaveQueues.set(id, next);
+        const cleanup = () => { if (todoSaveQueues.get(id) === next) todoSaveQueues.delete(id); };
+        next.then(cleanup, cleanup);
+        return next;
+    }
+
     // 카테고리 / 반복 수정 (PATCH /todos/{id})
     async function updateTodoField(id, patch) {
         if (!validateTodoInput(patch)) return;
@@ -1273,19 +1285,27 @@
             : [`${key}-input-${id}`]);
         const submitted = snapshotDrafts(fields);
         const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/todos/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(patch)
-            });
-            if (!res.ok) { await showTodoError(res); return; }
-            const updated = await res.json();
-            const todo = todos.find(t => t.id === id);
-            if (todo) Object.assign(todo, updated);
-            acknowledgeDrafts(submitted);
-            render();
-        } catch (e) { console.error(e); }
+        return queueTodoSave(id, token, async () => {
+            try {
+                const res = await fetch(`${API_BASE}/todos/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(patch)
+                });
+                if (localStorage.getItem('token') !== token) return;
+                if (!res.ok) { await showTodoError(res); return; }
+                const updated = await res.json();
+                if (localStorage.getItem('token') !== token) return;
+                const todo = todos.find(t => t.id === id);
+                // A response also contains unrelated fields, which may have changed meanwhile.
+                if (todo) Object.keys(patch).forEach(key => { todo[key] = updated[key]; });
+                acknowledgeDrafts(submitted);
+                render();
+            } catch (e) {
+                console.error(e);
+                showAlert('todo-alert', '저장하지 못했어요. 연결을 확인하고 다시 저장해주세요.');
+            }
+        });
     }
     function updateCategory(id, value) { updateTodoField(id, { category: value.trim() || null }); }
     function changeRepeatType(id, value) {
@@ -1299,7 +1319,7 @@
         const repeat = type === 'custom' ? { type: 'weekly', days } : { type };
         if (type === 'interval') {
             repeat.value = Number(document.getElementById(`repeat-interval-${id}`).value);
-            if (!Number.isInteger(repeat.value) || repeat.value < 1) { alert('반복 간격은 1 이상의 정수로 입력해주세요.'); return; }
+            if (!Number.isInteger(repeat.value) || repeat.value < 1 || repeat.value > 3650) { alert('반복 간격은 1~3650일로 입력해주세요.'); return; }
         }
         await updateTodoField(id, { repeat });
     }
@@ -1313,7 +1333,7 @@
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!res.ok) return;
+            if (!res.ok) { await showTodoError(res); return; }
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) todo.completed = updated.completed;
@@ -1378,7 +1398,7 @@
                 //  핵심 수정: toISOString() 제거 → 로컬 시간 문자열 그대로 전송
                 body: JSON.stringify({ deadline: val })
             });
-            if (!res.ok) return;
+            if (!res.ok) { await showTodoError(res); return; }
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) todo.deadline = updated.deadline;
@@ -1716,7 +1736,7 @@
         const days = repeat.days || [];
         return `<div class="repeat-editor">
             <select id="repeat-input-${todo.id}" aria-label="반복 주기" onchange="changeRepeatType(${todo.id}, this.value)">${repeatOptions(repeat)}</select>
-            <input type="number" min="1" step="1" id="repeat-interval-${todo.id}" aria-label="반복 간격 (일)" value="${Number.isInteger(repeat.value) ? repeat.value : 1}" ${repeat.type === 'interval' ? '' : 'hidden'}>
+            <input type="number" min="1" max="3650" step="1" id="repeat-interval-${todo.id}" aria-label="반복 간격 (1~3650일)" value="${Number.isInteger(repeat.value) ? repeat.value : 1}" ${repeat.type === 'interval' ? '' : 'hidden'}>
             <div class="repeat-custom" id="repeat-custom-${todo.id}" ${repeat.type === 'weekly' && days.length ? '' : 'hidden'}>
                 <div class="detail-section-title">반복할 요일을 선택하세요</div>
                 <div class="repeat-days" id="repeat-days-${todo.id}">
@@ -2055,36 +2075,36 @@
     }
 
     // JSON 가져오기 (서버에 새 항목으로 추가)
+    let importInProgress = false;
     async function importData(fileInput) {
+        if (importInProgress) return;
         const file = fileInput.files[0];
         if (!file) return;
         fileInput.value = '';
-        let items;
+        if (file.size > 10 * 1024 * 1024) { showAlert('settings-alert', '백업 파일은 10MB 이하로 선택해주세요.'); return; }
+        importInProgress = true;
         try {
-            items = JSON.parse(await file.text());
-            if (!Array.isArray(items)) throw new Error('형식 오류');
-        } catch { showAlert('settings-alert', '올바른 JSON 파일이 아닙니다.'); return; }
-        if (!confirm(`${items.length}개 항목을 가져올까요? (현재 목록에 추가됩니다)`)) return;
-        const token = localStorage.getItem('token');
-        let ok = 0;
-        for (const it of items) {
-            if (!it.content) continue;
+            let items;
             try {
-                const res = await fetch(`${API_BASE}/todos`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({
-                        content: it.content, deadline: it.deadline || null,
-                        category: it.category || null, repeat: it.repeat || 'none',
-                        priority: typeof it.priority === 'number' ? it.priority : 1,
-                        detail: it.detail || null
-                    })
-                });
-                if (res.ok) ok++;
-            } catch (e) { console.error(e); }
-        }
-        showAlert('settings-alert', `${ok}개 항목을 가져왔습니다.`, 'success');
-        loadTodos();
+                items = JSON.parse(await file.text());
+                if (!Array.isArray(items) || !items.length || items.length > 1000) throw new Error('형식 오류');
+            } catch { showAlert('settings-alert', '1~1,000개 항목이 담긴 JSON 백업 파일을 선택해주세요.'); return; }
+            if (!confirm(`${items.length}개 항목과 체크리스트·완료 상태를 가져올까요? (현재 목록에 추가됩니다)`)) return;
+            await Promise.all([...todoSaveQueues.values()]);
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/todos/import`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ items })
+            });
+            const result = await res.json();
+            if (!res.ok) { showAlert('settings-alert', result.detail || '백업을 복원하지 못했어요. 파일을 확인해주세요.'); return; }
+            showAlert('settings-alert', `${result.imported}개 항목과 체크리스트를 복원했습니다.`, 'success');
+            await loadTodos();
+        } catch (e) {
+            console.error(e);
+            showAlert('settings-alert', '복원 결과를 확인하지 못했어요. 다시 가져오기 전에 목록을 새로고침해 확인해주세요.');
+        } finally { importInProgress = false; }
     }
 
     async function changePassword() {

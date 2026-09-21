@@ -17,7 +17,7 @@ from main import app
 from backend.config import JWT_SECRET_KEY
 from backend.utils.todos import add_interval
 from backend.database import SessionLocal
-from backend.models import UserTable, EmailVerificationTable, AuthRateLimitTable, SubtaskTable
+from backend.models import UserTable, EmailVerificationTable, AuthRateLimitTable, SubtaskTable, TodoTable
 from backend.config import KST
 from backend.security import password_version
 
@@ -216,6 +216,94 @@ class SecurityTests(unittest.TestCase):
             with SessionLocal() as db:
                 self.assertEqual(db.query(SubtaskTable).filter_by(todo_id=ids[0]).count(), 0)
                 self.assertEqual(db.query(SubtaskTable).filter_by(todo_id=ids[1]).count(), 1)
+
+    def test_password_rechecks_share_a_persistent_limit(self):
+        with TestClient(app) as client:
+            headers = self.login(client)
+            for index in range(10):
+                if index % 2:
+                    response = client.request('DELETE', '/account', headers=headers, json={'password': 'wrong'})
+                else:
+                    response = client.post('/change-password', headers=headers, json={
+                        'current_password': 'wrong', 'new_password': 'password456'})
+                self.assertEqual(response.status_code, 400)
+            with patch('backend.routers.account.bcrypt.checkpw') as check:
+                for method, path, data in [
+                    ('POST', '/change-password', {'current_password': 'password123', 'new_password': 'password456'}),
+                    ('DELETE', '/account', {'password': 'password123'}),
+                ]:
+                    response = client.request(method, path, headers=headers, json=data)
+                    self.assertEqual(response.status_code, 429)
+                    self.assertIn('retry-after', response.headers)
+                check.assert_not_called()
+            self.assertEqual(client.get('/todos', headers=headers).status_code, 200)
+
+    def test_repeat_bounds_and_date_overflow(self):
+        with TestClient(app, raise_server_exceptions=False) as client:
+            headers = self.login(client)
+            for repeat, deadline in [
+                ({'type': 'interval', 'value': 1000000000}, '2026-09-22T12:00'),
+                ({'type': 'interval', 'value': 3651}, '2026-09-22T12:00'),
+                ({'type': 'daily'}, '9999-12-31T12:00'),
+                ({'type': 'weekly', 'days': ['mon']}, '9999-12-31T12:00'),
+                ({'type': 'monthly'}, '9999-12-31T12:00'),
+            ]:
+                response = client.post('/todos', headers=headers, json={
+                    'content': 'invalid repeat', 'repeat': repeat, 'deadline': deadline})
+                self.assertEqual(response.status_code, 400, response.text)
+            created = client.post('/todos', headers=headers, json={'content': 'valid repeat',
+                'deadline': '2026-09-22T12:00', 'repeat': {'type': 'interval', 'value': 3650}})
+            self.assertEqual(created.status_code, 200)
+            todo_id = created.json()['id']
+            self.assertEqual(client.patch(f'/todos/{todo_id}/deadline', headers=headers,
+                json={'deadline': '9999-12-31T12:00'}).status_code, 400)
+            # Old invalid rows should fail gracefully and still be repairable.
+            with SessionLocal() as db:
+                db.get(TodoTable, todo_id).repeat_cycle = {'type': 'interval', 'value': 1000000000}
+                db.commit()
+            self.assertEqual(client.patch(f'/todos/{todo_id}/toggle', headers=headers).status_code, 400)
+            with SessionLocal() as db:
+                self.assertFalse(db.get(TodoTable, todo_id).completed)
+            self.assertEqual(client.patch(f'/todos/{todo_id}', headers=headers,
+                json={'repeat': {'type': 'daily'}}).status_code, 200)
+            self.assertEqual(client.patch(f'/todos/{todo_id}/toggle', headers=headers).status_code, 200)
+
+    def test_backup_roundtrip_and_atomic_rollback(self):
+        from sqlalchemy import event
+        with TestClient(app, raise_server_exceptions=False) as client:
+            headers = self.login(client)
+            backup = [{'id': 987654, 'content': 'restored', 'completed': True,
+                       'deadline': '2026-09-22T12:00:00', 'category': 'home',
+                       'repeat': {'type': 'weekly', 'days': ['mon', 'wed', 'fri']},
+                       'priority': 2, 'detail': 'memo', 'sort_order': 3,
+                       'subtasks': [{'id': 987655, 'content': 'child', 'completed': True}]},
+                      {'content': 'first', 'completed': False, 'sort_order': 1}]
+            before = client.get('/todos', headers=headers).json()
+            response = client.post('/todos/import', headers=headers, json={'items': backup})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()['imported'], 2)
+            after = client.get('/todos', headers=headers).json()
+            self.assertEqual([t['id'] for t in after[:-2]], [t['id'] for t in before])
+            self.assertEqual(after[-2]['content'], 'first')
+            restored = after[-1]
+            for key in ['content', 'completed', 'deadline', 'category', 'repeat', 'priority', 'detail']:
+                self.assertEqual(restored[key], backup[0][key])
+            self.assertNotEqual(restored['id'], backup[0]['id'])
+            self.assertEqual(restored['subtasks'][0]['content'], 'child')
+            self.assertTrue(restored['subtasks'][0]['completed'])
+            # Invalid later entries must not leave a partially restored backup.
+            self.assertEqual(client.post('/todos/import', headers=headers,
+                json={'items': [backup[0], {'content': None}]}).status_code, 422)
+            self.assertEqual(client.get('/todos', headers=headers).json(), after)
+            def fail_insert(*args):
+                raise RuntimeError('simulated child insert failure')
+            event.listen(SubtaskTable, 'before_insert', fail_insert)
+            try:
+                self.assertEqual(client.post('/todos/import', headers=headers,
+                    json={'items': backup}).status_code, 500)
+            finally:
+                event.remove(SubtaskTable, 'before_insert', fail_insert)
+            self.assertEqual(client.get('/todos', headers=headers).json(), after)
 
 
 if __name__ == '__main__':

@@ -5,6 +5,8 @@ from calendar import monthrange
 
 from fastapi import HTTPException
 
+MAX_REPEAT_DAYS = 3650
+
 
 def normalize_repeat(value):
     """Accept legacy strings and validate structured repeat settings."""
@@ -26,8 +28,8 @@ def normalize_repeat(value):
         result["days"] = [day for day in weekdays if day in days]
     if repeat_type == "interval":
         days = value.get("value", 1)
-        if isinstance(days, bool) or not isinstance(days, int) or days < 1:
-            raise HTTPException(status_code=400, detail="반복 간격은 1 이상의 정수여야 합니다.")
+        if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= MAX_REPEAT_DAYS:
+            raise HTTPException(status_code=400, detail=f"반복 간격은 1~{MAX_REPEAT_DAYS}일이어야 합니다.")
         result["value"] = days
     return result
 
@@ -52,6 +54,14 @@ def subtask_dict(subtask):
 
 
 def add_interval(current_deadline: datetime, repeat_cycle: dict):
+    """Return the next date, or a recoverable client error at date limits."""
+    try:
+        return _add_interval(current_deadline, repeat_cycle)
+    except (OverflowError, ValueError):
+        raise HTTPException(400, '다음 반복 날짜가 지원 범위를 벗어납니다. 마감일이나 반복 설정을 변경해주세요.')
+
+
+def _add_interval(current_deadline: datetime, repeat_cycle: dict):
     repeat_cycle = normalize_repeat(repeat_cycle)
     if not repeat_cycle:
         return None
