@@ -17,7 +17,7 @@ from main import app
 from backend.config import JWT_SECRET_KEY
 from backend.utils.todos import add_interval
 from backend.database import SessionLocal
-from backend.models import UserTable, EmailVerificationTable, AuthRateLimitTable
+from backend.models import UserTable, EmailVerificationTable, AuthRateLimitTable, SubtaskTable
 from backend.config import KST
 from backend.security import password_version
 
@@ -69,7 +69,7 @@ class SecurityTests(unittest.TestCase):
             db.query(UserTable).filter(UserTable.user_id == 'security-user').delete()
             db.add(UserTable(user_id='security-user', email='security@example.invalid',
                              password=bcrypt.hashpw(b'password123', bcrypt.gensalt()).decode()))
-            db.add(EmailVerificationTable(email='security@example.invalid', code='123456',
+            db.add(EmailVerificationTable(email='security@example.invalid', purpose='reset', code='123456',
                     expires_at=datetime.now(KST).replace(tzinfo=None) + timedelta(minutes=3)))
             db.commit()
 
@@ -112,6 +112,110 @@ class SecurityTests(unittest.TestCase):
             for _ in range(10):
                 self.assertEqual(client.post('/login', json={'username':'security-user','password':'wrong'}).status_code, 401)
             self.assertEqual(client.post('/login', json={'username':'security-user','password':'password123'}).status_code, 429)
+
+    def test_new_password_policy_on_all_three_endpoints(self):
+        with TestClient(app) as client:
+            headers = self.login(client)
+            for password in ['', '1234567', '        ', '가' * 25, 'a' * 73, None, 12345678]:
+                for path, body in [
+                    ('/signup', {'username': 'new-user', 'email': 'new@example.invalid',
+                                 'code': '123456', 'password': password}),
+                    ('/reset-password', {'email': 'security@example.invalid',
+                                         'code': '123456', 'new_password': password}),
+                    ('/change-password', {'current_password': 'password123', 'new_password': password}),
+                ]:
+                    with self.subTest(path=path, password_type=type(password).__name__):
+                        response = client.post(path, headers=headers, json=body)
+                        self.assertEqual(response.status_code, 422, response.text)
+                        self.assertIsInstance(response.json()['detail'], str)
+            # 24 Korean characters = exactly 72 UTF-8 bytes.
+            self.assertEqual(client.post('/change-password', headers=headers, json={
+                'current_password': 'password123', 'new_password': '가' * 24}).status_code, 200)
+            self.login(client, '가' * 24)
+
+    def test_legacy_short_password_still_logs_in(self):
+        with SessionLocal() as db:
+            user = db.query(UserTable).filter_by(user_id='security-user').one()
+            user.password = bcrypt.hashpw(b'1234', bcrypt.gensalt()).decode()
+            db.commit()
+        with TestClient(app) as client:
+            self.login(client, '1234')
+
+    def test_verification_purposes_and_single_use(self):
+        with SessionLocal() as db:
+            db.query(EmailVerificationTable).delete()
+            db.commit()
+        with TestClient(app) as client, patch('backend.routers.auth.send_email'):
+            self.assertEqual(client.post('/request-code', json={
+                'email': 'security@example.invalid'}).status_code, 200)
+            with SessionLocal() as db:
+                code = db.get(EmailVerificationTable, ('security@example.invalid', 'signup')).code
+            self.assertEqual(client.post('/reset-password', json={
+                'email': 'security@example.invalid', 'code': code,
+                'new_password': 'password456'}).status_code, 400)
+            # Reset-only code cannot create an account, even with the correct digits.
+            with SessionLocal() as db:
+                db.add(EmailVerificationTable(email='new@example.invalid', purpose='reset', code='654321',
+                       expires_at=datetime.now(KST).replace(tzinfo=None) + timedelta(minutes=3)))
+                db.commit()
+            signup = {'username': 'new-user', 'email': 'new@example.invalid',
+                      'password': 'password123', 'code': '654321'}
+            self.assertEqual(client.post('/signup', json=signup).status_code, 400)
+            self.assertEqual(client.post('/request-code', json={'email': signup['email']}).status_code, 200)
+            with SessionLocal() as db:
+                signup['code'] = db.get(EmailVerificationTable, (signup['email'], 'signup')).code
+            self.assertEqual(client.post('/signup', json=signup).status_code, 200)
+            self.assertEqual(client.post('/signup', json=signup).status_code, 400)
+
+    def test_malformed_requests_are_client_errors(self):
+        with TestClient(app, raise_server_exceptions=False) as client:
+            headers = self.login(client)
+            todo = client.post('/todos', headers=headers, json={'content': 'validation'}).json()
+            sub = client.post(f"/todos/{todo['id']}/subtasks", headers=headers,
+                              json={'content': 'child'}).json()
+            cases = [
+                ('POST', '/login', {'username': 'security-user'}),
+                ('POST', '/login', {'username': 'security-user', 'password': 'a' * 73}),
+                ('POST', '/todos', {}),
+                ('POST', '/todos', {'content': '  '}),
+                ('POST', '/todos', {'content': 123}),
+                ('POST', '/todos', {'content': 'test', 'deadline': 'not-a-date'}),
+                ('POST', '/todos', {'content': 'test', 'deadline': 123}),
+                ('POST', '/todos', {'content': 'test', 'priority': True}),
+                ('PATCH', f"/todos/{todo['id']}", {'content': None}),
+                ('PATCH', f"/todos/{todo['id']}", {'priority': None}),
+                ('PATCH', f"/todos/{todo['id']}", {'category': []}),
+                ('PATCH', f"/todos/{todo['id']}/deadline", {}),
+                ('PATCH', f"/todos/{todo['id']}/deadline", {'deadline': 'bad-date'}),
+                ('POST', '/todos/reorder', {'order': [{}]}),
+                ('POST', '/todos/reorder', {'order': [todo['id'], todo['id']]}),
+                ('POST', f"/todos/{todo['id']}/subtasks", {'content': None}),
+                ('PATCH', f"/subtasks/{sub['id']}", {'completed': 'false'}),
+                ('PATCH', f"/subtasks/{sub['id']}", {'completed': None}),
+                ('DELETE', '/account', {'password': 123}),
+            ]
+            for method, path, body in cases:
+                with self.subTest(method=method, path=path, body=body):
+                    response = client.request(method, path, headers=headers, json=body)
+                    self.assertEqual(response.status_code, 422, response.text)
+            response = client.patch(f"/todos/{todo['id']}/deadline", headers=headers,
+                                    json={'deadline': '2026-09-22T00:00:00Z'})
+            self.assertEqual(response.json()['deadline'], '2026-09-22T09:00:00')
+            self.assertEqual(client.patch(f"/todos/{todo['id']}/deadline", headers=headers,
+                                         json={'deadline': None}).status_code, 200)
+
+    def test_delete_removes_only_owned_checklist(self):
+        with TestClient(app) as client:
+            headers = self.login(client)
+            ids = []
+            for _ in range(2):
+                todo = client.post('/todos', headers=headers, json={'content': 'delete test'}).json()
+                ids.append(todo['id'])
+                client.post(f"/todos/{todo['id']}/subtasks", headers=headers, json={'content': 'child'})
+            self.assertEqual(client.delete(f'/todos/{ids[0]}', headers=headers).status_code, 200)
+            with SessionLocal() as db:
+                self.assertEqual(db.query(SubtaskTable).filter_by(todo_id=ids[0]).count(), 0)
+                self.assertEqual(db.query(SubtaskTable).filter_by(todo_id=ids[1]).count(), 1)
 
 
 if __name__ == '__main__':

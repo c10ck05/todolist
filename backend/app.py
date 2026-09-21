@@ -3,6 +3,8 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import backend.models  # Registers all SQLAlchemy mappings before create_all().
@@ -24,6 +26,15 @@ async def lifespan(app: FastAPI):
 def create_app():
     Base.metadata.create_all(bind=engine)
     application = FastAPI(lifespan=lifespan)
+
+    @application.exception_handler(RequestValidationError)
+    async def invalid_request(request, exc):
+        # Keep the frontend's string detail contract; never echo passwords/inputs.
+        error = exc.errors()[0]
+        field = '.'.join(str(part) for part in error['loc'] if part != 'body')
+        message = error['msg'].removeprefix('Value error, ')
+        return JSONResponse(status_code=422, content={'detail': f'{field}: {message}'})
+
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

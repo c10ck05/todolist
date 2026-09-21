@@ -47,9 +47,11 @@ class UserTable(Base):
 
 
 class EmailVerificationTable(Base):
-    __tablename__ = "email_verifications"
+    # Legacy purpose-less codes are deliberately not migrated.
+    __tablename__ = "email_verifications_scoped"
 
     email = Column(String(100), primary_key=True)
+    purpose = Column(String(20), primary_key=True)
     code = Column(String(6), nullable=False)
     expires_at = Column(DateTime, nullable=False)
 

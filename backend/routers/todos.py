@@ -1,12 +1,12 @@
 """Todo CRUD, deadline, and ordering endpoints."""
 
-from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user_id, get_db
+from backend.schemas import TodoCreate, TodoUpdate, DeadlineRequest, ReorderRequest
 from backend.models import SubtaskTable, TodoTable, TodoRecurrenceTable
 from backend.utils.todos import add_interval, normalize_repeat, subtask_dict, todo_dict
 
@@ -40,14 +40,14 @@ def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session
 
 @router.post("/todos")
 def create_todo(
-    todo_data: dict,
+    todo_data: TodoCreate,
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
 ):
+    todo_data = todo_data.model_dump()
     content = todo_data.get("content")
     user_id = get_current_user_id(authorization)
-    deadline_str = todo_data.get("deadline")
-    deadline = datetime.fromisoformat(deadline_str) if deadline_str else None
+    deadline = todo_data.get("deadline")
     category = todo_data.get("category") or None
     if category:
         category = category.strip()[:50] or None
@@ -84,6 +84,7 @@ def delete_todo(
     if user_id != todo.owner_id:
         raise HTTPException(status_code=400, detail="본인 것만 삭제할 수 있습니다.")
     db.delete(todo)
+    db.query(SubtaskTable).filter(SubtaskTable.todo_id == id).delete(synchronize_session=False)
     db.query(TodoRecurrenceTable).filter(TodoRecurrenceTable.source_id == id).delete()
     db.commit()
     return {"message": "삭제 완료"}
@@ -131,12 +132,13 @@ def toggle_todo(
 @router.patch("/todos/{id}")
 def update_todo(
     id: int,
-    data: dict,
+    data: TodoUpdate,
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
 ):
     user_id = get_current_user_id(authorization)
     todo = get_owned_todo(id, user_id, db)
+    data = data.model_dump(exclude_unset=True)
     if "content" in data:
         content = (data.get("content") or "").strip()
         if not content:
@@ -162,14 +164,13 @@ def update_todo(
 @router.patch("/todos/{id}/deadline")
 def update_deadline(
     id: int,
-    data: dict,
+    data: DeadlineRequest,
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
 ):
     user_id = get_current_user_id(authorization)
     todo = get_owned_todo(id, user_id, db)
-    deadline_str = data.get("deadline")
-    todo.deadline = datetime.fromisoformat(deadline_str) if deadline_str else None
+    todo.deadline = data.deadline
     todo.reminder_sent = False
     db.commit()
     return {
@@ -180,12 +181,12 @@ def update_deadline(
 
 @router.post("/todos/reorder")
 def reorder_todos(
-    data: dict,
+    data: ReorderRequest,
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
 ):
     user_id = get_current_user_id(authorization)
-    order = data.get("order") or []
+    order = data.order
     todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id).all()
     todo_map = {todo.id: todo for todo in todos}
     for index, todo_id in enumerate(order):

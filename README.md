@@ -168,8 +168,9 @@ subtasks
 ├── content       (Text)
 └── completed     (Boolean)
 
-email_verifications
+email_verifications_scoped
 ├── email         (PK, String)
+├── purpose       (PK, String, signup/reset)
 ├── code          (String, 6자리)
 └── expires_at    (DateTime, 3분 유효)
 ```
@@ -209,6 +210,17 @@ uvicorn main:app --reload
 경우에는 기본 브랜치에 푸시하면 자동으로 배포됩니다.
 
 ### 5. 프론트엔드 접속
+
+인증 검증 업데이트 배포 시 `email_verifications_scoped` 테이블이 자동 생성됩니다.
+기존 계정과 할 일은 유지되며, 기존 `email_verifications`의 인증번호는 더 이상
+사용하지 않습니다. 배포 전에 인증번호를 받은 사용자는 다시 요청해야 합니다.
+구 테이블은 자동 삭제하지 않습니다. 신규 테이블을 만들 수 있는 DB 권한이 필요합니다.
+
+회원가입·비밀번호 변경·재설정에는 공통으로 8자 이상, UTF-8 기준 72바이트 이하의
+비밀번호가 필요합니다. 공백만으로 된 비밀번호는 허용하지 않으며, 기존 짧은
+비밀번호로의 로그인은 유지됩니다. 잘못된 입력은 422와 문자열 `detail`로 반환합니다.
+할 일 삭제 시 하위 항목도 같은 트랜잭션에서 삭제합니다. 기존에 남은 고아 데이터는
+이번 배포에서 자동 삭제하지 않습니다.
 
 `index.html`을 브라우저로 열거나,  
 VS Code Live Server 등으로 `http://127.0.0.1:5500` 에서 실행

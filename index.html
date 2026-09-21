@@ -541,6 +541,7 @@
             .deadline-panel { flex-direction: column; align-items: stretch; }
             .deadline-panel input[type="datetime-local"] { min-width: unset; width: 100%; }
         }
+        .password-help { margin: -2px 0 14px; font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
     </style>
 
     <!-- ============================================================
@@ -853,7 +854,7 @@
         <div id="login-alert" class="alert alert-error"></div>
         <div class="input-wrap"><input type="text" id="login-username" placeholder="아이디"></div>
         <div class="input-wrap">
-            <input type="password" id="login-password" placeholder="비밀번호">
+            <input type="password" id="login-password" placeholder="비밀번호" autocomplete="current-password">
             <button class="pw-toggle" onclick="togglePw('login-password', this)">표시</button>
         </div>
         <a class="link-blue" onclick="showSection('section-reset')">비밀번호를 잊으셨나요?</a>
@@ -872,9 +873,10 @@
         <div id="signup-success" class="alert alert-success"></div>
         <div class="input-wrap"><input type="text" id="signup-username" placeholder="아이디"></div>
         <div class="input-wrap">
-            <input type="password" id="signup-password" placeholder="비밀번호">
+            <input type="password" id="signup-password" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" aria-describedby="signup-password-help">
             <button class="pw-toggle" onclick="togglePw('signup-password', this)">표시</button>
         </div>
+        <p id="signup-password-help" class="password-help">8자 이상 · 최대 72바이트 (한글은 보통 1자당 3바이트)</p>
         <div class="email-row">
             <div class="input-wrap"><input type="email" id="signup-email" placeholder="이메일"></div>
             <button class="btn-verify" id="btn-request-code" onclick="requestSignupCode()">인증 요청</button>
@@ -899,9 +901,10 @@
         </div>
         <div class="input-wrap"><input type="text" id="reset-code" placeholder="6자리 인증번호" maxlength="6"></div>
         <div class="input-wrap">
-            <input type="password" id="reset-new-password" placeholder="새 비밀번호">
+            <input type="password" id="reset-new-password" placeholder="새 비밀번호 (8자 이상)" autocomplete="new-password" aria-describedby="reset-password-help">
             <button class="pw-toggle" onclick="togglePw('reset-new-password', this)">표시</button>
         </div>
+        <p id="reset-password-help" class="password-help">8자 이상 · 최대 72바이트 (한글은 보통 1자당 3바이트)</p>
         <button class="btn-main" id="btn-reset" onclick="resetPassword()">비밀번호 변경</button>
     </div>
     <div class="below-card"><a onclick="showSection('section-login')">← 로그인으로 돌아가기</a></div>
@@ -926,6 +929,7 @@
             <button class="btn-add" id="btn-add-todo" onclick="addTodo()">+ 등록</button>
         </div>
         <datalist id="category-list"></datalist>
+        <div id="todo-alert" class="alert alert-error" role="alert"></div>
         <div class="filter-tabs">
             <button class="tab-btn" onclick="filterTodos('all', this)">전체</button>
             <button class="tab-btn active" onclick="filterTodos('active', this)">할 일</button>
@@ -968,8 +972,9 @@
 
         <div class="modal-section">
             <div class="modal-section-title">비밀번호 변경</div>
-            <input type="password" id="cur-pw" class="modal-input" placeholder="현재 비밀번호">
-            <input type="password" id="new-pw" class="modal-input" placeholder="새 비밀번호 (4자 이상)">
+            <input type="password" id="cur-pw" class="modal-input" placeholder="현재 비밀번호" autocomplete="current-password">
+            <input type="password" id="new-pw" class="modal-input" placeholder="새 비밀번호 (8자 이상)" autocomplete="new-password" aria-describedby="change-password-help">
+            <p id="change-password-help" class="password-help">8자 이상 · 최대 72바이트 (한글은 보통 1자당 3바이트)</p>
             <button class="modal-btn primary" onclick="changePassword()">비밀번호 변경</button>
         </div>
 
@@ -1028,7 +1033,7 @@
     function showAlert(id, msg, type = 'error') {
         const el = document.getElementById(id);
         el.className = `alert alert-${type}`;
-        el.textContent = msg;
+        el.textContent = typeof msg === 'string' ? msg : '입력 내용을 확인한 뒤 다시 시도해주세요.';
         el.style.display = 'block';
         setTimeout(() => el.style.display = 'none', 4000);
     }
@@ -1036,6 +1041,45 @@
         const btn = document.getElementById(btnId);
         btn.disabled = loading;
         btn.innerHTML = loading ? `<span class="spinner"></span> 처리중...` : text;
+    }
+
+    function validatePassword(value, alertId, isNew = false) {
+        let message = '';
+        if (isNew && ([...value].length < 8 || !value.trim())) {
+            message = '새 비밀번호는 공백만 사용할 수 없으며 8자 이상이어야 합니다.';
+        } else if (new TextEncoder().encode(value).length > 72) {
+            message = '비밀번호는 최대 72바이트까지 입력할 수 있어요. 한글은 보통 1자당 3바이트예요.';
+        }
+        if (message) showAlert(alertId, message);
+        return !message;
+    }
+
+    function validateEmail(email, alertId) {
+        const valid = email.length <= 100 && /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email);
+        if (!valid) showAlert(alertId, '올바른 이메일 주소를 입력해주세요.');
+        return valid;
+    }
+
+    function validateCode(code, alertId) {
+        const valid = /^[0-9]{6}$/.test(code);
+        if (!valid) showAlert(alertId, '인증번호는 숫자 6자리로 입력해주세요.');
+        return valid;
+    }
+
+    function validateTodoInput(data) {
+        for (const [key, limit, label] of [['content', 10000, '내용'], ['category', 50, '카테고리'], ['detail', 50000, '메모']]) {
+            if (typeof data[key] === 'string' && [...data[key]].length > limit) {
+                showAlert('todo-alert', `${label}은 ${limit.toLocaleString()}자 이하로 입력해주세요.`);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    async function showTodoError(res) {
+        if (res.status === 401) { logout(); return; }
+        const data = await res.json().catch(() => ({}));
+        showAlert('todo-alert', data.detail || '저장하지 못했어요. 입력 내용을 확인하고 다시 시도해주세요.');
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1058,8 +1102,9 @@
     // =====================
     async function login() {
         const username = document.getElementById('login-username').value.trim();
-        const password = document.getElementById('login-password').value.trim();
+        const password = document.getElementById('login-password').value;
         if (!username || !password) { showAlert('login-alert', '아이디와 비밀번호를 입력해주세요.'); return; }
+        if (!validatePassword(password, 'login-alert')) return;
         setLoading('btn-login', true, '로그인');
         try {
             const res = await fetch(`${API_BASE}/login`, {
@@ -1078,7 +1123,7 @@
 
     async function requestSignupCode() {
         const email = document.getElementById('signup-email').value.trim();
-        if (!email) { showAlert('signup-alert', '이메일을 입력해주세요.'); return; }
+        if (!validateEmail(email, 'signup-alert')) return;
         const btn = document.getElementById('btn-request-code');
         btn.disabled = true; btn.textContent = '발송중...';
         try {
@@ -1096,10 +1141,12 @@
 
     async function signup() {
         const username = document.getElementById('signup-username').value.trim();
-        const password = document.getElementById('signup-password').value.trim();
+        const password = document.getElementById('signup-password').value;
         const email = document.getElementById('signup-email').value.trim();
         const code = document.getElementById('signup-code').value.trim();
         if (!username || !password || !email || !code) { showAlert('signup-alert', '모든 항목을 입력해주세요.'); return; }
+        if ([...username].length > 50) { showAlert('signup-alert', '아이디는 50자 이하로 입력해주세요.'); return; }
+        if (!validatePassword(password, 'signup-alert', true) || !validateEmail(email, 'signup-alert') || !validateCode(code, 'signup-alert')) return;
         setLoading('btn-signup', true, '인증 및 가입 완료');
         try {
             const res = await fetch(`${API_BASE}/signup`, {
@@ -1117,7 +1164,7 @@
 
     async function requestResetCode() {
         const email = document.getElementById('reset-email').value.trim();
-        if (!email) { showAlert('reset-alert', '이메일을 입력해주세요.'); return; }
+        if (!validateEmail(email, 'reset-alert')) return;
         const btn = document.getElementById('btn-request-reset-code');
         btn.disabled = true; btn.textContent = '발송중...';
         try {
@@ -1136,8 +1183,9 @@
     async function resetPassword() {
         const email = document.getElementById('reset-email').value.trim();
         const code = document.getElementById('reset-code').value.trim();
-        const new_password = document.getElementById('reset-new-password').value.trim();
+        const new_password = document.getElementById('reset-new-password').value;
         if (!email || !code || !new_password) { showAlert('reset-alert', '모든 항목을 입력해주세요.'); return; }
+        if (!validatePassword(new_password, 'reset-alert', true) || !validateEmail(email, 'reset-alert') || !validateCode(code, 'reset-alert')) return;
         setLoading('btn-reset', true, '비밀번호 변경');
         try {
             const res = await fetch(`${API_BASE}/reset-password`, {
@@ -1185,6 +1233,7 @@
         if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
 
         const category = catInput.value.trim() || null;
+        if (!validateTodoInput({ content, category })) return;
 
         const btn = document.getElementById('btn-add-todo');
         if (btn.disabled) return;
@@ -1199,7 +1248,7 @@
                 body: JSON.stringify({ content, category })
             });
 
-            if (res.status === 401) { logout(); return; }
+            if (!res.ok) { await showTodoError(res); return; }
 
             const newTodo = await res.json();
             todos.push(newTodo);
@@ -1210,6 +1259,7 @@
             render();
         } catch (e) {
             console.error(e);
+            showAlert('todo-alert', '연결을 확인하고 다시 시도해주세요. 입력 내용은 유지됩니다.');
         } finally {
             btn.disabled = false; btn.innerHTML = '+ 등록';
         }
@@ -1217,6 +1267,7 @@
 
     // 카테고리 / 반복 수정 (PATCH /todos/{id})
     async function updateTodoField(id, patch) {
+        if (!validateTodoInput(patch)) return;
         const fields = Object.keys(patch).flatMap(key => key === 'repeat'
             ? [`repeat-input-${id}`, `repeat-interval-${id}`, ...Object.keys(WEEKDAYS).map(day => `repeat-day-${id}-${day}`)]
             : [`${key}-input-${id}`]);
@@ -1228,7 +1279,7 @@
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(patch)
             });
-            if (!res.ok) return;
+            if (!res.ok) { await showTodoError(res); return; }
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) Object.assign(todo, updated);
@@ -1554,6 +1605,7 @@
         const input = document.getElementById(`subtask-input-${todoId}`);
         const content = input.value.trim();
         if (!content) return;
+        if (!validateTodoInput({ content })) return;
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/todos/${todoId}/subtasks`, {
@@ -1561,7 +1613,7 @@
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ content })
             });
-            if (!res.ok) return;
+            if (!res.ok) { await showTodoError(res); return; }
             const sub = await res.json();
             const todo = todos.find(t => t.id === todoId);
             if (todo) { todo.subtasks = todo.subtasks || []; todo.subtasks.push(sub); }
@@ -2039,6 +2091,7 @@
         const cur = document.getElementById('cur-pw').value;
         const nw = document.getElementById('new-pw').value;
         if (!cur || !nw) { showAlert('settings-alert', '비밀번호를 모두 입력해주세요.'); return; }
+        if (!validatePassword(cur, 'settings-alert') || !validatePassword(nw, 'settings-alert', true)) return;
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/change-password`, {
@@ -2060,6 +2113,7 @@
     async function deleteAccount() {
         const pw = prompt('계정을 삭제하려면 비밀번호를 입력하세요.\n(모든 할 일이 영구 삭제됩니다)');
         if (!pw) return;
+        if (!validatePassword(pw, 'settings-alert')) return;
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/account`, {

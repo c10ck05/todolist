@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user_id, get_db
+from backend.schemas import SubtaskCreate, SubtaskUpdate
 from backend.models import SubtaskTable
 from backend.routers.todos import get_owned_todo
 from backend.utils.todos import subtask_dict
@@ -17,13 +18,13 @@ router = APIRouter()
 @router.post("/todos/{id}/subtasks")
 def create_subtask(
     id: int,
-    data: dict,
+    data: SubtaskCreate,
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
 ):
     user_id = get_current_user_id(authorization)
     get_owned_todo(id, user_id, db)
-    content = (data.get("content") or "").strip()
+    content = data.content
     if not content:
         raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
     subtask = SubtaskTable(todo_id=id, content=content, completed=False)
@@ -36,7 +37,7 @@ def create_subtask(
 @router.patch("/subtasks/{sid}")
 def update_subtask(
     sid: int,
-    data: dict,
+    data: SubtaskUpdate,
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
 ):
@@ -45,6 +46,7 @@ def update_subtask(
     if not subtask:
         raise HTTPException(status_code=404, detail="데이터가 없습니다.")
     get_owned_todo(subtask.todo_id, user_id, db)
+    data = data.model_dump(exclude_unset=True)
     if "completed" in data:
         subtask.completed = bool(data.get("completed"))
     if "content" in data:
