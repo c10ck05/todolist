@@ -5,6 +5,14 @@ from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
 from backend.database import Base
 
 
+class AuthRateLimitTable(Base):
+    __tablename__ = "auth_rate_limits"
+
+    key = Column(String(64), primary_key=True)
+    attempts = Column(Integer, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+
+
 class TodoTable(Base):
     __tablename__ = "todolist"
 
@@ -19,6 +27,14 @@ class TodoTable(Base):
     priority = Column(Integer, default=1, nullable=False)
     detail = Column(Text, nullable=True)
     sort_order = Column(Integer, nullable=True)
+
+
+class TodoRecurrenceTable(Base):
+    """One successor per source todo, even after undoing completion."""
+    __tablename__ = "todo_recurrences"
+
+    source_id = Column(Integer, primary_key=True)
+    successor_id = Column(Integer, nullable=False)
 
 
 class UserTable(Base):

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user_id, get_db
-from backend.models import EmailVerificationTable, SubtaskTable, TodoTable, UserTable
+from backend.models import EmailVerificationTable, SubtaskTable, TodoTable, UserTable, TodoRecurrenceTable
 
 
 router = APIRouter()
@@ -50,6 +50,7 @@ def delete_account(
 
     todo_ids = [todo.id for todo in db.query(TodoTable).filter(TodoTable.owner_id == user_id).all()]
     if todo_ids:
+        db.query(TodoRecurrenceTable).filter(TodoRecurrenceTable.source_id.in_(todo_ids)).delete(synchronize_session=False)
         db.query(SubtaskTable).filter(SubtaskTable.todo_id.in_(todo_ids)).delete(synchronize_session=False)
     db.query(TodoTable).filter(TodoTable.owner_id == user_id).delete(synchronize_session=False)
     db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user.email).delete(

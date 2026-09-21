@@ -1,6 +1,7 @@
 """Todo serialization and repeat-date helpers."""
 
 from datetime import datetime, timedelta
+from calendar import monthrange
 
 from fastapi import HTTPException
 
@@ -75,6 +76,9 @@ def add_interval(current_deadline: datetime, repeat_cycle: dict):
             days_ahead.append(difference or 7)
         return current_deadline + timedelta(days=min(days_ahead))
     if repeat_type == "monthly":
-        return current_deadline + timedelta(days=30)
+        year = current_deadline.year + (current_deadline.month == 12)
+        month = current_deadline.month % 12 + 1
+        day = min(current_deadline.day, monthrange(year, month)[1])
+        return current_deadline.replace(year=year, month=month, day=day)
 
     return None

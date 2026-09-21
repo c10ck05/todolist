@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user_id, get_db
-from backend.models import SubtaskTable, TodoTable
+from backend.models import SubtaskTable, TodoTable, TodoRecurrenceTable
 from backend.utils.todos import add_interval, normalize_repeat, subtask_dict, todo_dict
 
 
@@ -84,6 +84,7 @@ def delete_todo(
     if user_id != todo.owner_id:
         raise HTTPException(status_code=400, detail="본인 것만 삭제할 수 있습니다.")
     db.delete(todo)
+    db.query(TodoRecurrenceTable).filter(TodoRecurrenceTable.source_id == id).delete()
     db.commit()
     return {"message": "삭제 완료"}
 
@@ -95,10 +96,14 @@ def toggle_todo(
     db: Session = Depends(get_db),
 ):
     user_id = get_current_user_id(authorization)
-    todo = get_owned_todo(id, user_id, db)
+    todo = db.query(TodoTable).filter(TodoTable.id == id).with_for_update().first()
+    if not todo:
+        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
+    if todo.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="본인 리스트가 아닙니다.")
     todo.completed = not todo.completed
     spawned = None
-    if todo.completed and todo.deadline:
+    if todo.completed and todo.deadline and db.get(TodoRecurrenceTable, id) is None:
         next_deadline = add_interval(todo.deadline, todo.repeat_cycle)
         if next_deadline:
             spawned = TodoTable(
@@ -113,6 +118,8 @@ def toggle_todo(
                 reminder_sent=False,
             )
             db.add(spawned)
+            db.flush()
+            db.add(TodoRecurrenceTable(source_id=id, successor_id=spawned.id))
     db.commit()
     result = {"id": todo.id, "completed": todo.completed}
     if spawned:
@@ -148,7 +155,8 @@ def update_todo(
         detail = data.get("detail")
         todo.detail = (detail.strip() or None) if detail else None
     db.commit()
-    return todo_dict(todo)
+    subtasks = db.query(SubtaskTable).filter(SubtaskTable.todo_id == id).order_by(SubtaskTable.id).all()
+    return todo_dict(todo, [subtask_dict(subtask) for subtask in subtasks])
 
 
 @router.patch("/todos/{id}/deadline")

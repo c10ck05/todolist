@@ -1217,6 +1217,10 @@
 
     // 카테고리 / 반복 수정 (PATCH /todos/{id})
     async function updateTodoField(id, patch) {
+        const fields = Object.keys(patch).flatMap(key => key === 'repeat'
+            ? [`repeat-input-${id}`, `repeat-interval-${id}`, ...Object.keys(WEEKDAYS).map(day => `repeat-day-${id}-${day}`)]
+            : [`${key}-input-${id}`]);
+        const submitted = snapshotDrafts(fields);
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/todos/${id}`, {
@@ -1228,6 +1232,7 @@
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) Object.assign(todo, updated);
+            acknowledgeDrafts(submitted);
             render();
         } catch (e) { console.error(e); }
     }
@@ -1306,11 +1311,11 @@
             if (!panel) { openPanels.delete(id); return; }
             panel.classList.add('open');
             if (btn) { btn.classList.add('active'); btn.setAttribute('aria-expanded', 'true'); }
-            fillDeadlineInput(id);
         });
     }
 
     async function saveDeadline(id) {
+        const submitted = snapshotDrafts([`deadline-input-${id}`]);
         const input = document.getElementById(`deadline-input-${id}`);
         const val = input.value; // "2024-01-01T15:00" 형식 (로컬 시간)
         if (!val) { alert('날짜와 시간을 선택해주세요.'); return; }
@@ -1326,11 +1331,13 @@
             const updated = await res.json();
             const todo = todos.find(t => t.id === id);
             if (todo) todo.deadline = updated.deadline;
+            acknowledgeDrafts(submitted);
             render();
         } catch (e) { console.error(e); }
     }
 
     async function removeDeadline(id) {
+        const submitted = snapshotDrafts([`deadline-input-${id}`]);
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${API_BASE}/todos/${id}/deadline`, {
@@ -1341,6 +1348,7 @@
             if (!res.ok) return;
             const todo = todos.find(t => t.id === id);
             if (todo) todo.deadline = null;
+            acknowledgeDrafts(submitted);
             render();
         } catch (e) { console.error(e); }
     }
@@ -1542,6 +1550,7 @@
     }
 
     async function addSubtask(todoId) {
+        const submitted = snapshotDrafts([`subtask-input-${todoId}`]);
         const input = document.getElementById(`subtask-input-${todoId}`);
         const content = input.value.trim();
         if (!content) return;
@@ -1556,6 +1565,7 @@
             const sub = await res.json();
             const todo = todos.find(t => t.id === todoId);
             if (todo) { todo.subtasks = todo.subtasks || []; todo.subtasks.push(sub); }
+            acknowledgeDrafts(submitted);
             render();
         } catch (e) { console.error(e); }
     }
@@ -1658,7 +1668,7 @@
             <div class="repeat-custom" id="repeat-custom-${todo.id}" ${repeat.type === 'weekly' && days.length ? '' : 'hidden'}>
                 <div class="detail-section-title">반복할 요일을 선택하세요</div>
                 <div class="repeat-days" id="repeat-days-${todo.id}">
-                    ${Object.entries(WEEKDAYS).map(([day, label]) => `<label class="repeat-day"><input type="checkbox" value="${day}" ${days.includes(day) ? 'checked' : ''}><span>${label}</span></label>`).join('')}
+                    ${Object.entries(WEEKDAYS).map(([day, label]) => `<label class="repeat-day"><input id="repeat-day-${todo.id}-${day}" type="checkbox" value="${day}" ${days.includes(day) ? 'checked' : ''}><span>${label}</span></label>`).join('')}
                 </div>
             </div>
             <button class="btn-deadline-save" onclick="saveRepeat(${todo.id})">반복 저장</button>
@@ -1673,20 +1683,52 @@
         if (cats.length === 0) { container.innerHTML = ''; currentCategory = 'all'; }
         else {
             const chips = [['all', '전체 카테고리'], ...cats.map(c => [c, c]), ['none', '미분류']];
-            container.innerHTML = chips.map(([val, label]) =>
-                `<button class="tab-btn ${currentCategory === val ? 'active' : ''}" onclick="filterByCategory('${encodeURIComponent(val)}', this)">${escapeHtml(label)}</button>`
-            ).join('');
+            container.replaceChildren(...chips.map(([val, label]) => {
+                const button = document.createElement('button');
+                button.className = `tab-btn ${currentCategory === val ? 'active' : ''}`;
+                button.textContent = label;
+                button.addEventListener('click', () => filterByCategory(val, button));
+                return button;
+            }));
         }
         document.getElementById('category-list').innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
     }
 
-    function filterByCategory(encoded, btn) {
-        currentCategory = decodeURIComponent(encoded);
+    function filterByCategory(category, btn) {
+        currentCategory = category;
         document.querySelectorAll('#category-filters .tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         render();
     }
 
+    const detailDrafts = new Map();
+    function rememberDetailDraft(event) {
+        const el = event.target;
+        if (!el.id || !el.closest('.deadline-panel') || !el.matches('input, select, textarea')) return;
+        detailDrafts.set(el.id, el.type === 'checkbox' ? el.checked : el.value);
+    }
+    document.addEventListener('input', rememberDetailDraft, true);
+    document.addEventListener('change', rememberDetailDraft, true);
+    function snapshotDrafts(fields) {
+        return fields.map(id => [id, detailDrafts.get(id)]);
+    }
+    function acknowledgeDrafts(submitted) {
+        submitted.forEach(([id, value]) => {
+            if (detailDrafts.get(id) === value) detailDrafts.delete(id);
+        });
+    }
+    function restoreDetailDrafts() {
+        detailDrafts.forEach((value, id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.type === 'checkbox') el.checked = value;
+            else el.value = value;
+        });
+        todos.forEach(todo => {
+            const select = document.getElementById(`repeat-input-${todo.id}`);
+            if (select) changeRepeatType(todo.id, select.value);
+        });
+    }
     function render() {
         renderCategoryChips();
         if (viewMode === 'timeline') { renderTimeline(); return; }
@@ -1751,7 +1793,7 @@
                     <div class="detail-section">
                     <label class="detail-section-title" for="deadline-input-${t.id}">마감기한</label>
                     <div class="detail-deadline-row">
-                    <input type="datetime-local" id="deadline-input-${t.id}">
+                    <input type="datetime-local" id="deadline-input-${t.id}" value="${escapeHtml((t.deadline || '').slice(0, 16))}">
                     <button class="btn-deadline-save" onclick="saveDeadline(${t.id})">저장</button>
                     ${t.deadline ? `<button class="btn-deadline-remove" onclick="removeDeadline(${t.id})">제거</button>` : ''}
                     </div></div>
@@ -1767,6 +1809,7 @@
             </li>`;
         }).join('');
         applyOpenPanels();
+        restoreDetailDrafts();
     }
 
     // =====================
@@ -1929,6 +1972,8 @@
     }
 
     function logout() {
+        detailDrafts.clear();
+        openPanels.clear();
         localStorage.removeItem('token');
         todos = [];
         showSection('section-login');
@@ -2006,6 +2051,9 @@
             showAlert('settings-alert', '비밀번호가 변경되었습니다.', 'success');
             document.getElementById('cur-pw').value = '';
             document.getElementById('new-pw').value = '';
+            closeSettings();
+            logout();
+            showAlert('login-alert', '비밀번호가 변경되었습니다. 다시 로그인해주세요.', 'success');
         } catch { showAlert('settings-alert', '서버 오류'); }
     }
 

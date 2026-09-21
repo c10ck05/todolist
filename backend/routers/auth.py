@@ -1,29 +1,31 @@
 """Authentication and email-verification endpoints."""
 
-import random
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from backend.config import JWT_ALGORITHM, JWT_SECRET_KEY, KST
 from backend.dependencies import get_db
 from backend.models import EmailVerificationTable, UserTable
 from backend.services.email import send_email
+from backend.security import auth_limit, password_version
 
 
 router = APIRouter()
 
 
 @router.post("/request-code")
-def request_verification_code(email_data: dict, db: Session = Depends(get_db)):
+def request_verification_code(email_data: dict, request: Request, db: Session = Depends(get_db)):
     user_email = email_data.get("email")
-    if not user_email:
+    if not isinstance(user_email, str) or not user_email:
         raise HTTPException(status_code=400, detail="이메일을 입력해주세요.")
 
-    code = str(random.randint(100000, 999999))
+    auth_limit(request, user_email, 'send')
+    code = str(secrets.randbelow(900000) + 100000)
     expire_time = datetime.now(KST).replace(tzinfo=None) + timedelta(minutes=3)
     db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user_email).delete()
     db.add(EmailVerificationTable(email=user_email, code=code, expires_at=expire_time))
@@ -37,11 +39,14 @@ def request_verification_code(email_data: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/signup")
-def signup_todo(user_data: dict, db: Session = Depends(get_db)):
+def signup_todo(user_data: dict, request: Request, db: Session = Depends(get_db)):
     user_id = user_data.get("username")
     raw_password = user_data.get("password")
     user_email = user_data.get("email")
     input_code = user_data.get("code")
+    if not isinstance(user_email, str) or not user_email:
+        raise HTTPException(400, '이메일을 입력해주세요.')
+    auth_limit(request, user_email, 'verify')
 
     verification = db.query(EmailVerificationTable).filter(
         EmailVerificationTable.email == user_email
@@ -67,7 +72,11 @@ def signup_todo(user_data: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login_todo(login_data: dict, db: Session = Depends(get_db)):
+def login_todo(login_data: dict, request: Request, db: Session = Depends(get_db)):
+    username = login_data.get('username')
+    if not isinstance(username, str) or not username:
+        raise HTTPException(400, '아이디를 입력해주세요.')
+    auth_limit(request, username, 'login')
     user = db.query(UserTable).filter(UserTable.user_id == login_data.get("username")).first()
     if not user:
         raise HTTPException(status_code=404, detail="ID가 맞지 않습니다.")
@@ -75,6 +84,7 @@ def login_todo(login_data: dict, db: Session = Depends(get_db)):
     if bcrypt.checkpw(login_data.get("password").encode("utf-8"), user.password.encode("utf-8")):
         payload = {
             "sub": user.user_id,
+            "ver": password_version(user.password),
             "exp": datetime.now(timezone.utc) + timedelta(days=7),
         }
         token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
@@ -83,16 +93,17 @@ def login_todo(login_data: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/request-reset-code")
-def request_reset_code(email_data: dict, db: Session = Depends(get_db)):
+def request_reset_code(email_data: dict, request: Request, db: Session = Depends(get_db)):
     user_email = email_data.get("email")
-    if not user_email:
+    if not isinstance(user_email, str) or not user_email:
         raise HTTPException(status_code=400, detail="이메일을 입력해주세요.")
 
+    auth_limit(request, user_email, 'send')
     user = db.query(UserTable).filter(UserTable.email == user_email).first()
     if not user:
         raise HTTPException(status_code=400, detail="회원가입이 필요합니다.")
 
-    code = str(random.randint(100000, 999999))
+    code = str(secrets.randbelow(900000) + 100000)
     expire_time = datetime.now(KST).replace(tzinfo=None) + timedelta(minutes=3)
     db.query(EmailVerificationTable).filter(EmailVerificationTable.email == user_email).delete()
     db.add(EmailVerificationTable(email=user_email, code=code, expires_at=expire_time))
@@ -106,7 +117,11 @@ def request_reset_code(email_data: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/reset-password")
-def reset_password(reset_data: dict, db: Session = Depends(get_db)):
+def reset_password(reset_data: dict, request: Request, db: Session = Depends(get_db)):
+    email = reset_data.get('email')
+    if not isinstance(email, str) or not email:
+        raise HTTPException(400, '이메일을 입력해주세요.')
+    auth_limit(request, email, 'verify')
     user_data = db.query(UserTable).filter(UserTable.email == reset_data.get("email")).first()
     if not user_data:
         raise HTTPException(status_code=400, detail="일치하는 계정이 없습니다.")
