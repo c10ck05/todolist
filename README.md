@@ -115,10 +115,14 @@ todo-app/
 │   ├── models.py    # SQLAlchemy 테이블 모델
 │   ├── dependencies.py # DB / 인증 의존성
 │   ├── routers/     # 인증, 투두, 서브태스크, 계정, 헬스체크 API
-│   ├── services/    # Resend 이메일, 마감 리마인더 스케줄러
+│   ├── services/    # 소유권 검사, 이메일, 마감 리마인더
 │   └── utils/       # 투두 직렬화, 반복 기한 계산
 ├── requirements.txt # Python 패키지 목록
-└── index.html       # 프론트엔드 (단일 HTML 파일)
+├── index.html       # 화면 구조와 자산 연결
+├── frontend/
+│   ├── styles/      # base.css, theme.css (기존 스타일 적용 순서 유지)
+│   └── scripts/     # core, auth, todos, views, settings
+└── tests/           # 기능 회귀, 동시 요청, DB 조회 수 검증
 ```
 
 ### DB 테이블
@@ -164,7 +168,7 @@ todolist
 
 subtasks
 ├── id            (PK, Integer)
-├── todo_id       (Integer, FK → todolist.id)
+├── todo_id       (Integer, todolist.id 참조; 삭제 정리는 애플리케이션에서 처리)
 ├── content       (Text)
 └── completed     (Boolean)
 
@@ -243,7 +247,15 @@ ID는 새로 발급되며, 형식 오류나 저장 오류가 나면 전체 가�
 venv/bin/python -m unittest discover -s tests -v
 node tests/frontend_validation.cjs
 node tests/frontend_async.cjs
+node tests/frontend_assets.cjs
 ```
+
+프론트는 빌드 도구 없이 정적 파일로 실행됩니다. 배포할 때 `frontend/` 디렉터리도
+함께 포함해야 합니다. 스크립트는 HTML에 선언된 순서대로 로드하며, 기존 화면 디자인과
+API 주소는 유지합니다. 서비스워커 캐시에 분리된 파일도 포함합니다.
+
+백엔드 인증과 라우터는 요청별 DB 세션을 공유합니다. 마감 알림은 수신자를 한 번에
+조회하고, 백업은 부모 항목을 묶어서 저장합니다. DB 스키마 변경은 필요하지 않습니다.
 
 `index.html`을 브라우저로 열거나,  
 VS Code Live Server 등으로 `http://127.0.0.1:5500` 에서 실행

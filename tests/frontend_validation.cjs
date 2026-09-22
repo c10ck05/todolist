@@ -1,9 +1,7 @@
 // Run with: node tests/frontend_validation.cjs (no network or browser required).
-const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const html = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const script = require('./frontend_source.cjs');
 const elements = new Map();
 function element(id) {
     if (!elements.has(id)) elements.set(id, { value: '', style: {}, classList: { add() {}, remove() {} } });

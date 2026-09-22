@@ -1,12 +1,10 @@
 """Todo CRUD, deadline, and ordering endpoints."""
 
-from typing import Annotated
+from fastapi import APIRouter, HTTPException
 
-from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy.orm import Session
-
-from backend.dependencies import get_current_user_id, get_db
+from backend.dependencies import CurrentUser, DbSession
 from backend.schemas import TodoCreate, TodoUpdate, DeadlineRequest, ReorderRequest, BackupImport
+from backend.services.ownership import get_owned_todo
 from backend.models import SubtaskTable, TodoTable, TodoRecurrenceTable
 from backend.utils.todos import add_interval, normalize_repeat, subtask_dict, todo_dict
 
@@ -14,25 +12,17 @@ from backend.utils.todos import add_interval, normalize_repeat, subtask_dict, to
 router = APIRouter()
 
 
-def get_owned_todo(todo_id: int, user_id: str, db: Session):
-    todo = db.query(TodoTable).filter(TodoTable.id == todo_id).first()
-    if not todo:
-        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
-    if todo.owner_id != user_id:
-        raise HTTPException(status_code=403, detail="본인 리스트가 아닙니다.")
-    return todo
-
-
 @router.get("/todos")
-def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(get_db)):
-    user_id = get_current_user_id(authorization)
+def todos_get(user: CurrentUser, db: DbSession):
+    user_id = user.user_id
     todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id).order_by(
         TodoTable.sort_order.is_(None), TodoTable.sort_order, TodoTable.id
     ).all()
-    todo_ids = [todo.id for todo in todos]
     subtasks_by_todo = {}
-    if todo_ids:
-        subtasks = db.query(SubtaskTable).filter(SubtaskTable.todo_id.in_(todo_ids)).order_by(SubtaskTable.id).all()
+    if todos:
+        subtasks = db.query(SubtaskTable).join(TodoTable, SubtaskTable.todo_id == TodoTable.id).filter(
+            TodoTable.owner_id == user_id
+        ).order_by(SubtaskTable.id).all()
         for subtask in subtasks:
             subtasks_by_todo.setdefault(subtask.todo_id, []).append(subtask_dict(subtask))
     return [todo_dict(todo, subtasks_by_todo.get(todo.id, [])) for todo in todos]
@@ -41,46 +31,39 @@ def todos_get(authorization: Annotated[str | None, Header()] = None, db: Session
 @router.post("/todos")
 def create_todo(
     todo_data: TodoCreate,
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
-    todo_data = todo_data.model_dump()
-    content = todo_data.get("content")
-    user_id = get_current_user_id(authorization)
-    deadline = todo_data.get("deadline")
-    category = todo_data.get("category") or None
-    if category:
-        category = category.strip()[:50] or None
-    repeat = normalize_repeat(todo_data.get("repeat"))
+    user_id = user.user_id
+    deadline = todo_data.deadline
+    category = (todo_data.category or '').strip() or None
+    repeat = normalize_repeat(todo_data.repeat)
     if deadline:
         add_interval(deadline, repeat)
-    priority = todo_data.get("priority", 1)
-    if priority not in (0, 1, 2):
-        priority = 1
-    detail = todo_data.get("detail") or None
     new_todo = TodoTable(
-        todo=content,
+        todo=todo_data.content,
         owner_id=user_id,
         deadline=deadline,
         category=category,
         repeat_cycle=repeat,
-        priority=priority,
-        detail=detail,
+        priority=todo_data.priority,
+        detail=todo_data.detail or None,
     )
     db.add(new_todo)
+    db.flush()
+    result = todo_dict(new_todo)
     db.commit()
-    db.refresh(new_todo)
-    return todo_dict(new_todo)
+    return result
 
 
 @router.post("/todos/import")
 def import_todos(
     data: BackupImport,
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
     """Append a complete backup atomically, assigning fresh owned IDs."""
-    user_id = get_current_user_id(authorization)
+    user_id = user.user_id
     items = sorted(data.items, key=lambda item: (item.sort_order is None, item.sort_order or 0))
     for item in items:
         if item.deadline:
@@ -91,14 +74,17 @@ def import_todos(
     # Preserve the visible order of existing items and append the restored group.
     for index, todo in enumerate(existing):
         todo.sort_order = index
+    imported = []
     for index, item in enumerate(items, start=len(existing)):
         todo = TodoTable(todo=item.content, owner_id=user_id, deadline=item.deadline,
                          category=(item.category or '').strip() or None,
                          repeat_cycle=normalize_repeat(item.repeat), priority=item.priority,
                          detail=item.detail, completed=item.completed, sort_order=index,
                          reminder_sent=False)
-        db.add(todo)
-        db.flush()
+        imported.append(todo)
+    db.add_all(imported)
+    db.flush()
+    for item, todo in zip(items, imported):
         for child in item.subtasks:
             db.add(SubtaskTable(todo_id=todo.id, content=child.content, completed=child.completed))
     db.commit()
@@ -108,10 +94,10 @@ def import_todos(
 @router.delete("/todos/{id}")
 def delete_todo(
     id: int,
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
-    user_id = get_current_user_id(authorization)
+    user_id = user.user_id
     todo = db.query(TodoTable).filter(TodoTable.id == id).first()
     if not todo:
         raise HTTPException(status_code=404, detail="해당 투두를 찾을 수 없습니다.")
@@ -127,15 +113,11 @@ def delete_todo(
 @router.patch("/todos/{id}/toggle")
 def toggle_todo(
     id: int,
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
-    user_id = get_current_user_id(authorization)
-    todo = db.query(TodoTable).filter(TodoTable.id == id).with_for_update().first()
-    if not todo:
-        raise HTTPException(status_code=404, detail="데이터가 없습니다.")
-    if todo.owner_id != user_id:
-        raise HTTPException(status_code=403, detail="본인 리스트가 아닙니다.")
+    user_id = user.user_id
+    todo = get_owned_todo(id, user_id, db, lock=True)
     todo.completed = not todo.completed
     spawned = None
     if todo.completed and todo.deadline and db.get(TodoRecurrenceTable, id) is None:
@@ -155,11 +137,10 @@ def toggle_todo(
             db.add(spawned)
             db.flush()
             db.add(TodoRecurrenceTable(source_id=id, successor_id=spawned.id))
-    db.commit()
     result = {"id": todo.id, "completed": todo.completed}
     if spawned:
-        db.refresh(spawned)
         result["spawned"] = todo_dict(spawned)
+    db.commit()
     return result
 
 
@@ -167,65 +148,62 @@ def toggle_todo(
 def update_todo(
     id: int,
     data: TodoUpdate,
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
-    user_id = get_current_user_id(authorization)
+    user_id = user.user_id
     todo = get_owned_todo(id, user_id, db)
     data = data.model_dump(exclude_unset=True)
     if todo.deadline and 'repeat' in data:
         add_interval(todo.deadline, data['repeat'])
     if "content" in data:
-        content = (data.get("content") or "").strip()
-        if not content:
-            raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
-        todo.todo = content
+        todo.todo = data['content']
     if "category" in data:
         category = data.get("category")
-        todo.category = (category.strip()[:50] or None) if category else None
+        todo.category = (category.strip() or None) if category else None
     if "repeat" in data:
         todo.repeat_cycle = normalize_repeat(data.get("repeat"))
     if "priority" in data:
-        priority = data.get("priority")
-        if priority in (0, 1, 2):
-            todo.priority = priority
+        todo.priority = data['priority']
     if "detail" in data:
         detail = data.get("detail")
         todo.detail = (detail.strip() or None) if detail else None
-    db.commit()
     subtasks = db.query(SubtaskTable).filter(SubtaskTable.todo_id == id).order_by(SubtaskTable.id).all()
-    return todo_dict(todo, [subtask_dict(subtask) for subtask in subtasks])
+    result = todo_dict(todo, [subtask_dict(subtask) for subtask in subtasks])
+    db.commit()
+    return result
 
 
 @router.patch("/todos/{id}/deadline")
 def update_deadline(
     id: int,
     data: DeadlineRequest,
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
-    user_id = get_current_user_id(authorization)
+    user_id = user.user_id
     todo = get_owned_todo(id, user_id, db)
     if data.deadline:
         add_interval(data.deadline, todo.repeat_cycle)
     todo.deadline = data.deadline
     todo.reminder_sent = False
-    db.commit()
-    return {
+    result = {
         "id": todo.id,
         "deadline": todo.deadline.isoformat() if todo.deadline else None,
     }
+    db.commit()
+    return result
 
 
 @router.post("/todos/reorder")
 def reorder_todos(
     data: ReorderRequest,
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
-    user_id = get_current_user_id(authorization)
+    user_id = user.user_id
     order = data.order
-    todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id).all()
+    todos = db.query(TodoTable).filter(TodoTable.owner_id == user_id, TodoTable.id.in_(order)).all()
     todo_map = {todo.id: todo for todo in todos}
     for index, todo_id in enumerate(order):
         todo = todo_map.get(todo_id)

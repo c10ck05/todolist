@@ -1,9 +1,7 @@
 // Deterministic delayed-response tests. No production network requests.
-const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8')
-    .match(/<script>([\s\S]*?)<\/script>/)[1];
+const source = require('./frontend_source.cjs');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 function fixture() {
