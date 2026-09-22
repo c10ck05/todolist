@@ -12,7 +12,7 @@ function element(id) {
 let requests = [];
 const context = vm.createContext({
     TextEncoder, console, setTimeout() {}, setInterval() {},
-    navigator: {}, location: { protocol: 'file:' }, window: {},
+    navigator: {}, location: { protocol: 'file:' }, window: { addEventListener() {} },
     localStorage: { getItem() { return null; }, setItem() {} },
     document: {
         getElementById: element, addEventListener() {}, querySelectorAll() { return []; },
@@ -115,7 +115,7 @@ async function run() {
     context.fetch = async () => ({ ok: false, json: async () => ({ detail: 'Invalid backup' }) });
     await context.importData({ value: 'backup.json', files: [{ text: async () => JSON.stringify(backup) }] });
     assert.equal(element('settings-alert').className, 'alert alert-error');
-    assert.equal(element('settings-alert').textContent, 'Invalid backup');
+    assert.ok(element('settings-alert').textContent.startsWith('Invalid backup'));
     console.log('Frontend validation and failed-save regression checks passed.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

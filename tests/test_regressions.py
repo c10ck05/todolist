@@ -78,6 +78,59 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return {'Authorization': 'Bearer ' + response.json()['access_token']}
 
+    def test_reset_code_is_consumed_once_under_concurrent_requests(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        barrier = Barrier(2)
+        original_hash = bcrypt.hashpw
+        def synchronized_hash(*args):
+            barrier.wait(timeout=10)
+            return original_hash(*args)
+        def reset(password):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                return client.post('/reset-password', json={'email': 'security@example.invalid',
+                    'code': '123456', 'new_password': password}).status_code
+        with patch('backend.routers.auth.bcrypt.hashpw', side_effect=synchronized_hash), ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(reset, ['new-password-A', 'new-password-B']))
+        self.assertEqual(sorted(results), [200, 400])
+
+    def test_code_claim_rolls_back_with_failed_password_change(self):
+        from backend.routers.auth import consume_verification
+        def fail_after_claim(*args):
+            consume_verification(*args)
+            raise RuntimeError('simulate account update failure')
+        with TestClient(app, raise_server_exceptions=False) as client:
+            body = {'email': 'security@example.invalid', 'code': '123456', 'new_password': 'password456'}
+            with patch('backend.routers.auth.consume_verification', side_effect=fail_after_claim):
+                self.assertEqual(client.post('/reset-password', json=body).status_code, 500)
+            self.login(client)
+            self.assertEqual(client.post('/reset-password', json=body).status_code, 200)
+            self.assertEqual(client.post('/reset-password', json=body).status_code, 400)
+
+    def test_signup_code_is_consumed_once_under_concurrent_requests(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        email = 'concurrent-signup@example.invalid'
+        with SessionLocal() as db:
+            db.add(EmailVerificationTable(email=email, purpose='signup', code='654321',
+                expires_at=datetime.now(KST).replace(tzinfo=None) + timedelta(minutes=3)))
+            db.commit()
+        barrier, original_hash = Barrier(2), bcrypt.hashpw
+        def synchronized_hash(*args):
+            barrier.wait(timeout=10)
+            return original_hash(*args)
+        def signup(username):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                return client.post('/signup', json={'username': username, 'email': email,
+                    'code': '654321', 'password': 'password123'}).status_code
+        with patch('backend.routers.auth.bcrypt.hashpw', side_effect=synchronized_hash), ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(signup, ['concurrent-user-A', 'concurrent-user-B']))
+        self.assertEqual(sorted(results), [200, 400])
+
+    def test_health_reports_deployment_revision(self):
+        with TestClient(app) as client, patch.dict(os.environ, {'RENDER_GIT_COMMIT': 'test-commit'}):
+            self.assertEqual(client.get('/health').json(), {'status': 'ok', 'revision': 'test-commit'})
+
     def test_password_change_and_reset_revoke_tokens(self):
         with TestClient(app) as client:
             old = self.login(client)

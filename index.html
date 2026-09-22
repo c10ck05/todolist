@@ -932,7 +932,7 @@
         <div id="todo-alert" class="alert alert-error" role="alert"></div>
         <div class="filter-tabs">
             <button class="tab-btn" onclick="filterTodos('all', this)">전체</button>
-            <button class="tab-btn active" onclick="filterTodos('active', this)">할 일</button>
+            <button class="tab-btn active" id="tab-active" onclick="filterTodos('active', this)">할 일</button>
             <button class="tab-btn" onclick="filterTodos('completed', this)">완료</button>
             <button class="tab-btn" onclick="filterTodos('overdue', this)">마감초과</button>
             <button class="tab-btn" id="tab-timeline" onclick="switchToTimeline(this)">타임라인</button>
@@ -1076,10 +1076,34 @@
         return true;
     }
 
-    async function showTodoError(res) {
-        if (res.status === 401) { logout(); return; }
-        const data = await res.json().catch(() => ({}));
-        showAlert('todo-alert', data.detail || '저장하지 못했어요. 입력 내용을 확인하고 다시 시도해주세요.');
+    let sessionEpoch = 0;
+    let listRequestVersion = 0;
+    function captureSession() { return { token: localStorage.getItem('token'), epoch: sessionEpoch }; }
+    function isCurrentSession(session) {
+        return session.epoch === sessionEpoch && session.token === localStorage.getItem('token');
+    }
+    function reportRequestError(session, error, alertId = 'todo-alert') {
+        if (isCurrentSession(session)) showAlert(alertId, error.message || '연결을 확인하고 다시 시도해주세요.');
+    }
+    async function requestJson(session, path, options = {}) {
+        if (!isCurrentSession(session)) throw new Error('이전 로그인 요청입니다.');
+        const mutating = options.method && options.method !== 'GET';
+        if (mutating) listRequestVersion++;
+        const res = await fetch(API_BASE + path, {
+            ...options,
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.token}`, ...options.headers }
+        });
+        if (!isCurrentSession(session)) throw new Error('이전 로그인 응답입니다.');
+        if (res.status === 401) {
+            logout();
+            showAlert('login-alert', '로그인이 만료되었습니다. 다시 로그인해주세요.');
+            throw new Error('로그인이 만료되었습니다.');
+        }
+        const data = await res.json();
+        if (!isCurrentSession(session)) throw new Error('이전 로그인 응답입니다.');
+        if (mutating) listRequestVersion++;
+        if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : '요청을 처리하지 못했어요.');
+        return data;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1101,10 +1125,12 @@
     // 로그인 / 회원가입 / 재설정
     // =====================
     async function login() {
+        if (document.getElementById('btn-login').disabled) return;
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
         if (!username || !password) { showAlert('login-alert', '아이디와 비밀번호를 입력해주세요.'); return; }
         if (!validatePassword(password, 'login-alert')) return;
+        const session = captureSession();
         setLoading('btn-login', true, '로그인');
         try {
             const res = await fetch(`${API_BASE}/login`, {
@@ -1113,11 +1139,13 @@
                 body: JSON.stringify({ username, password })
             });
             const data = await res.json();
+            if (!isCurrentSession(session)) return;
             if (!res.ok) { showAlert('login-alert', data.detail || '로그인 실패'); return; }
             localStorage.setItem('token', data.access_token);
+            resetSessionView();
             showSection('section-todo');
             loadTodos();
-        } catch { showAlert('login-alert', '서버 오류가 발생했습니다.'); }
+        } catch (error) { reportRequestError(session, error, 'login-alert'); }
         finally { setLoading('btn-login', false, '로그인'); }
     }
 
@@ -1214,62 +1242,44 @@
     // 투두 CRUD
     // =====================
     async function loadTodos() {
-        const token = localStorage.getItem('token');
+        const session = captureSession();
+        const version = ++listRequestVersion;
         try {
-            const res = await fetch(`${API_BASE}/todos`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.status === 401) { logout(); return; }
-            todos = await res.json();
+            const loaded = await requestJson(session, '/todos');
+            if (!isCurrentSession(session) || version !== listRequestVersion) return;
+            if (!Array.isArray(loaded)) throw new Error('목록을 불러오지 못했어요. 다시 시도해주세요.');
+            todos = loaded;
             render();
-        } catch (e) { console.error(e); }
+        } catch (error) { reportRequestError(session, error); }
     }
 
     async function addTodo() {
         const input = document.getElementById('todo-input');
         const catInput = document.getElementById('todo-category');
-
         const content = input.value.trim();
-        if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
-
         const category = catInput.value.trim() || null;
+        if (!content) { input.style.borderColor = '#cc1016'; setTimeout(() => input.style.borderColor = '', 1000); return; }
         if (!validateTodoInput({ content, category })) return;
-
         const btn = document.getElementById('btn-add-todo');
         if (btn.disabled) return;
-        btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
-
-        const token = localStorage.getItem('token');
-
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+        const session = captureSession();
         try {
-            const res = await fetch(`${API_BASE}/todos`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ content, category })
-            });
-
-            if (!res.ok) { await showTodoError(res); return; }
-
-            const newTodo = await res.json();
+            const newTodo = await requestJson(session, '/todos', { method: 'POST', body: JSON.stringify({ content, category }) });
+            if (!isCurrentSession(session)) return;
             todos.push(newTodo);
-
-            input.value = '';
-            catInput.value = '';
-
+            if (input.value.trim() === content) input.value = '';
+            if ((catInput.value.trim() || null) === category) catInput.value = '';
             render();
-        } catch (e) {
-            console.error(e);
-            showAlert('todo-alert', '연결을 확인하고 다시 시도해주세요. 입력 내용은 유지됩니다.');
-        } finally {
-            btn.disabled = false; btn.innerHTML = '+ 등록';
-        }
+        } catch (error) { reportRequestError(session, error); }
+        finally { if (isCurrentSession(session)) { btn.disabled = false; btn.innerHTML = '+ 등록'; } }
     }
 
     const todoSaveQueues = new Map();
-    function queueTodoSave(id, token, save) {
+    function queueTodoSave(id, session, save) {
         const previous = todoSaveQueues.get(id) || Promise.resolve();
         const next = previous.catch(() => {}).then(() => {
-            if (localStorage.getItem('token') === token) return save();
+            if (isCurrentSession(session)) return save();
         });
         todoSaveQueues.set(id, next);
         const cleanup = () => { if (todoSaveQueues.get(id) === next) todoSaveQueues.delete(id); };
@@ -1277,34 +1287,22 @@
         return next;
     }
 
-    // 카테고리 / 반복 수정 (PATCH /todos/{id})
     async function updateTodoField(id, patch) {
         if (!validateTodoInput(patch)) return;
         const fields = Object.keys(patch).flatMap(key => key === 'repeat'
             ? [`repeat-input-${id}`, `repeat-interval-${id}`, ...Object.keys(WEEKDAYS).map(day => `repeat-day-${id}-${day}`)]
             : [`${key}-input-${id}`]);
         const submitted = snapshotDrafts(fields);
-        const token = localStorage.getItem('token');
-        return queueTodoSave(id, token, async () => {
+        const session = captureSession();
+        return queueTodoSave(id, session, async () => {
             try {
-                const res = await fetch(`${API_BASE}/todos/${id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(patch)
-                });
-                if (localStorage.getItem('token') !== token) return;
-                if (!res.ok) { await showTodoError(res); return; }
-                const updated = await res.json();
-                if (localStorage.getItem('token') !== token) return;
+                const updated = await requestJson(session, `/todos/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+                if (!isCurrentSession(session)) return;
                 const todo = todos.find(t => t.id === id);
-                // A response also contains unrelated fields, which may have changed meanwhile.
                 if (todo) Object.keys(patch).forEach(key => { todo[key] = updated[key]; });
                 acknowledgeDrafts(submitted);
                 render();
-            } catch (e) {
-                console.error(e);
-                showAlert('todo-alert', '저장하지 못했어요. 연결을 확인하고 다시 저장해주세요.');
-            }
+            } catch (error) { reportRequestError(session, error); }
         });
     }
     function updateCategory(id, value) { updateTodoField(id, { category: value.trim() || null }); }
@@ -1327,33 +1325,34 @@
     function updateDetail(id, value) { updateTodoField(id, { detail: value.trim() || null }); }
 
     async function toggleTodo(id) {
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/todos/${id}/toggle`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!res.ok) { await showTodoError(res); return; }
-            const updated = await res.json();
-            const todo = todos.find(t => t.id === id);
-            if (todo) todo.completed = updated.completed;
-            // 반복 투두 완료 시 서버가 만든 다음 회차를 목록에 추가
-            if (updated.spawned) todos.push(updated.spawned);
-            render();
-        } catch (e) { console.error(e); }
+        const session = captureSession();
+        return queueTodoSave(id, session, async () => {
+            try {
+                await performToggle(id, session);
+            } catch (error) { reportRequestError(session, error); }
+        });
     }
-
+    async function performToggle(id, session) {
+        const updated = await requestJson(session, `/todos/${id}/toggle`, { method: 'PATCH' });
+        if (!isCurrentSession(session)) return;
+        const todo = todos.find(t => t.id === id);
+        if (todo) todo.completed = updated.completed;
+        if (updated.spawned && !todos.some(t => t.id === updated.spawned.id)) todos.push(updated.spawned);
+        render();
+    }
+    async function performDelete(id, session) {
+        await requestJson(session, `/todos/${id}`, { method: 'DELETE' });
+        if (!isCurrentSession(session)) return;
+        todos = todos.filter(t => t.id !== id);
+        openPanels.delete(id);
+        render();
+    }
     async function deleteTodo(id) {
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/todos/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!res.ok) return;
-            todos = todos.filter(t => t.id !== id);
-            render();
-        } catch (e) { console.error(e); }
+        const session = captureSession();
+        return queueTodoSave(id, session, async () => {
+            try { await performDelete(id, session); }
+            catch (error) { reportRequestError(session, error); }
+        });
     }
 
     // =====================
@@ -1386,42 +1385,26 @@
     }
 
     async function saveDeadline(id) {
-        const submitted = snapshotDrafts([`deadline-input-${id}`]);
-        const input = document.getElementById(`deadline-input-${id}`);
-        const val = input.value; // "2024-01-01T15:00" 형식 (로컬 시간)
-        if (!val) { alert('날짜와 시간을 선택해주세요.'); return; }
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/todos/${id}/deadline`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                //  핵심 수정: toISOString() 제거 → 로컬 시간 문자열 그대로 전송
-                body: JSON.stringify({ deadline: val })
-            });
-            if (!res.ok) { await showTodoError(res); return; }
-            const updated = await res.json();
-            const todo = todos.find(t => t.id === id);
-            if (todo) todo.deadline = updated.deadline;
-            acknowledgeDrafts(submitted);
-            render();
-        } catch (e) { console.error(e); }
+        const value = document.getElementById(`deadline-input-${id}`).value;
+        if (!value) { alert('날짜와 시간을 선택해주세요.'); return; }
+        return persistDeadline(id, value);
     }
-
-    async function removeDeadline(id) {
+    async function removeDeadline(id) { return persistDeadline(id, null); }
+    async function persistDeadline(id, value) {
         const submitted = snapshotDrafts([`deadline-input-${id}`]);
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/todos/${id}/deadline`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ deadline: null })
-            });
-            if (!res.ok) return;
-            const todo = todos.find(t => t.id === id);
-            if (todo) todo.deadline = null;
-            acknowledgeDrafts(submitted);
-            render();
-        } catch (e) { console.error(e); }
+        const session = captureSession();
+        return queueTodoSave(id, session, async () => {
+            try {
+                const updated = await requestJson(session, `/todos/${id}/deadline`, {
+                    method: 'PATCH', body: JSON.stringify({ deadline: value })
+                });
+                if (!isCurrentSession(session)) return;
+                const todo = todos.find(t => t.id === id);
+                if (todo) todo.deadline = updated.deadline;
+                acknowledgeDrafts(submitted);
+                render();
+            } catch (error) { reportRequestError(session, error); }
+        });
     }
 
     // =====================
@@ -1569,27 +1552,34 @@
         input.addEventListener('blur', () => commit(true));
     }
 
-    // 일괄 처리
-    async function completeAll() {
-        const targets = todos.filter(t => !t.completed);
-        if (targets.length === 0) return;
-        if (!confirm(`할 일 ${targets.length}개를 모두 완료 처리할까요?`)) return;
-        const token = localStorage.getItem('token');
-        await Promise.all(targets.map(t =>
-            fetch(`${API_BASE}/todos/${t.id}/toggle`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${token}` } })
-        ));
-        loadTodos();
-    }
-    async function clearCompleted() {
-        const targets = todos.filter(t => t.completed);
-        if (targets.length === 0) { alert('완료된 항목이 없습니다.'); return; }
-        if (!confirm(`완료된 항목 ${targets.length}개를 삭제할까요?`)) return;
-        const token = localStorage.getItem('token');
-        await Promise.all(targets.map(t =>
-            fetch(`${API_BASE}/todos/${t.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } })
-        ));
-        todos = todos.filter(t => !t.completed);
-        render();
+    // 일괄 처리: 실패한 항목은 유지하고, 재클릭으로 완료가 취소되지 않도록 한다.
+    let bulkInProgress = false;
+    async function completeAll() { return runBulkAction(false); }
+    async function clearCompleted() { return runBulkAction(true); }
+    async function runBulkAction(deleting) {
+        if (bulkInProgress) return;
+        const targets = todos.filter(t => deleting ? t.completed : !t.completed);
+        if (!targets.length) return;
+        if (!confirm(`${targets.length}개 항목을 ${deleting ? '삭제' : '완료 처리'}할까요?`)) return;
+        const session = captureSession();
+        bulkInProgress = true;
+        let failures = 0;
+        try {
+            for (const target of targets) {
+                if (!isCurrentSession(session)) return;
+                try {
+                    await queueTodoSave(target.id, session, async () => {
+                        const current = todos.find(t => t.id === target.id);
+                        if (!current || (deleting ? !current.completed : current.completed)) return;
+                        if (deleting) await performDelete(target.id, session);
+                        else await performToggle(target.id, session);
+                    });
+                } catch { failures++; }
+            }
+            if (isCurrentSession(session) && failures) {
+                showAlert('todo-alert', `${failures}개 항목을 처리하지 못했어요. 연결 상태와 목록을 확인한 뒤 다시 시도해주세요.`);
+            }
+        } finally { if (isCurrentSession(session)) bulkInProgress = false; }
     }
 
     // =====================
@@ -1622,53 +1612,43 @@
 
     async function addSubtask(todoId) {
         const submitted = snapshotDrafts([`subtask-input-${todoId}`]);
-        const input = document.getElementById(`subtask-input-${todoId}`);
-        const content = input.value.trim();
-        if (!content) return;
-        if (!validateTodoInput({ content })) return;
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/todos/${todoId}/subtasks`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ content })
-            });
-            if (!res.ok) { await showTodoError(res); return; }
-            const sub = await res.json();
-            const todo = todos.find(t => t.id === todoId);
-            if (todo) { todo.subtasks = todo.subtasks || []; todo.subtasks.push(sub); }
-            acknowledgeDrafts(submitted);
-            render();
-        } catch (e) { console.error(e); }
+        const content = document.getElementById(`subtask-input-${todoId}`).value.trim();
+        if (!content || !validateTodoInput({ content })) return;
+        const session = captureSession();
+        return queueTodoSave(todoId, session, async () => {
+            try {
+                const sub = await requestJson(session, `/todos/${todoId}/subtasks`, { method: 'POST', body: JSON.stringify({ content }) });
+                if (!isCurrentSession(session)) return;
+                const todo = todos.find(t => t.id === todoId);
+                if (todo) { todo.subtasks = todo.subtasks || []; todo.subtasks.push(sub); }
+                acknowledgeDrafts(submitted);
+                render();
+            } catch (error) { reportRequestError(session, error); }
+        });
     }
-
     async function toggleSubtask(todoId, subId, completed) {
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/subtasks/${subId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ completed })
-            });
-            if (!res.ok) return;
-            const todo = todos.find(t => t.id === todoId);
-            const sub = todo?.subtasks?.find(s => s.id === subId);
-            if (sub) sub.completed = completed;
-            render();
-        } catch (e) { console.error(e); }
+        const session = captureSession();
+        return queueTodoSave(todoId, session, async () => {
+            try {
+                const updated = await requestJson(session, `/subtasks/${subId}`, { method: 'PATCH', body: JSON.stringify({ completed }) });
+                if (!isCurrentSession(session)) return;
+                const sub = todos.find(t => t.id === todoId)?.subtasks?.find(s => s.id === subId);
+                if (sub) sub.completed = updated.completed;
+                render();
+            } catch (error) { reportRequestError(session, error); }
+        });
     }
-
     async function deleteSubtask(todoId, subId) {
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE}/subtasks/${subId}`, {
-                method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!res.ok) return;
-            const todo = todos.find(t => t.id === todoId);
-            if (todo) todo.subtasks = (todo.subtasks || []).filter(s => s.id !== subId);
-            render();
-        } catch (e) { console.error(e); }
+        const session = captureSession();
+        return queueTodoSave(todoId, session, async () => {
+            try {
+                await requestJson(session, `/subtasks/${subId}`, { method: 'DELETE' });
+                if (!isCurrentSession(session)) return;
+                const todo = todos.find(t => t.id === todoId);
+                if (todo) todo.subtasks = (todo.subtasks || []).filter(s => s.id !== subId);
+                render();
+            } catch (error) { reportRequestError(session, error); }
+        });
     }
 
     // =====================
@@ -1696,15 +1676,21 @@
         todos.splice(to, 0, moved);
         dragId = null;
         render();
-        // 서버에 새 순서 저장
-        const token = localStorage.getItem('token');
-        try {
-            await fetch(`${API_BASE}/todos/reorder`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ order: todos.map(t => t.id) })
-            });
-        } catch (err) { console.error(err); }
+        // Save reorder operations serially and surface failures.
+        const order = todos.map(t => t.id);
+        const session = captureSession();
+        await queueTodoSave('order', session, async () => {
+            try {
+                await requestJson(session, '/todos/reorder', { method: 'POST', body: JSON.stringify({ order }) });
+                if (!isCurrentSession(session)) return;
+                const positions = new Map(order.map((id, index) => [id, index]));
+                todos.sort((a, b) => (positions.get(a.id) ?? order.length) - (positions.get(b.id) ?? order.length));
+                render();
+            } catch (error) {
+                reportRequestError(session, error);
+                if (isCurrentSession(session)) await loadTodos();
+            }
+        });
     }
 
     // =====================
@@ -2043,13 +2029,41 @@
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function logout() {
+    function resetSessionView() {
+        sessionEpoch++;
+        listRequestVersion++;
         detailDrafts.clear();
         openPanels.clear();
-        localStorage.removeItem('token');
+        todoSaveQueues.clear();
+        bulkInProgress = false;
         todos = [];
+        currentFilter = 'active';
+        currentCategory = 'all';
+        viewMode = 'list';
+        selectedCalKey = null;
+        document.querySelectorAll('.tab-btn').forEach(button => button.classList.remove('active'));
+        document.getElementById('tab-active').classList.add('active');
+        applyViewVisibility();
+        ['todo-list', 'timeline-view', 'calendar-view', 'category-filters', 'category-list', 'stats-bar'].forEach(id => {
+            document.getElementById(id).innerHTML = '';
+        });
+        ['search-input', 'todo-input', 'todo-category', 'cur-pw', 'new-pw'].forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('todo-alert').style.display = 'none';
+        document.getElementById('btn-add-todo').disabled = false;
+        document.getElementById('btn-add-todo').innerHTML = '+ 등록';
+        closeSettings();
+    }
+    function logout() {
+        localStorage.removeItem('token');
+        resetSessionView();
         showSection('section-login');
     }
+    window.addEventListener('storage', event => {
+        if (event.key !== 'token' && event.key !== null) return;
+        resetSessionView();
+        if (localStorage.getItem('token')) { showSection('section-todo'); loadTodos(); }
+        else showSection('section-login');
+    });
 
     // =====================
     // 설정 / 데이터 / 계정
@@ -2083,27 +2097,26 @@
         fileInput.value = '';
         if (file.size > 10 * 1024 * 1024) { showAlert('settings-alert', '백업 파일은 10MB 이하로 선택해주세요.'); return; }
         importInProgress = true;
+        const session = captureSession();
         try {
             let items;
             try {
                 items = JSON.parse(await file.text());
+                if (!isCurrentSession(session)) return;
                 if (!Array.isArray(items) || !items.length || items.length > 1000) throw new Error('형식 오류');
             } catch { showAlert('settings-alert', '1~1,000개 항목이 담긴 JSON 백업 파일을 선택해주세요.'); return; }
             if (!confirm(`${items.length}개 항목과 체크리스트·완료 상태를 가져올까요? (현재 목록에 추가됩니다)`)) return;
             await Promise.all([...todoSaveQueues.values()]);
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE}/todos/import`, {
+            if (!isCurrentSession(session)) return;
+            const result = await requestJson(session, '/todos/import', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ items })
             });
-            const result = await res.json();
-            if (!res.ok) { showAlert('settings-alert', result.detail || '백업을 복원하지 못했어요. 파일을 확인해주세요.'); return; }
+            if (!isCurrentSession(session)) return;
             showAlert('settings-alert', `${result.imported}개 항목과 체크리스트를 복원했습니다.`, 'success');
             await loadTodos();
         } catch (e) {
-            console.error(e);
-            showAlert('settings-alert', '복원 결과를 확인하지 못했어요. 다시 가져오기 전에 목록을 새로고침해 확인해주세요.');
+            reportRequestError(session, new Error(`${e.message || '복원 결과를 확인하지 못했어요.'} 다시 가져오기 전에 목록을 새로고침해 확인해주세요.`), 'settings-alert');
         } finally { importInProgress = false; }
     }
 
@@ -2112,41 +2125,37 @@
         const nw = document.getElementById('new-pw').value;
         if (!cur || !nw) { showAlert('settings-alert', '비밀번호를 모두 입력해주세요.'); return; }
         if (!validatePassword(cur, 'settings-alert') || !validatePassword(nw, 'settings-alert', true)) return;
-        const token = localStorage.getItem('token');
+        const session = captureSession();
         try {
-            const res = await fetch(`${API_BASE}/change-password`, {
+            await requestJson(session, '/change-password', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ current_password: cur, new_password: nw })
             });
-            const data = await res.json();
-            if (!res.ok) { showAlert('settings-alert', data.detail || '변경 실패'); return; }
+            if (!isCurrentSession(session)) return;
             showAlert('settings-alert', '비밀번호가 변경되었습니다.', 'success');
             document.getElementById('cur-pw').value = '';
             document.getElementById('new-pw').value = '';
             closeSettings();
             logout();
             showAlert('login-alert', '비밀번호가 변경되었습니다. 다시 로그인해주세요.', 'success');
-        } catch { showAlert('settings-alert', '서버 오류'); }
+        } catch (error) { reportRequestError(session, error, 'settings-alert'); }
     }
 
     async function deleteAccount() {
         const pw = prompt('계정을 삭제하려면 비밀번호를 입력하세요.\n(모든 할 일이 영구 삭제됩니다)');
         if (!pw) return;
         if (!validatePassword(pw, 'settings-alert')) return;
-        const token = localStorage.getItem('token');
+        const session = captureSession();
         try {
-            const res = await fetch(`${API_BASE}/account`, {
+            await requestJson(session, '/account', {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ password: pw })
             });
-            const data = await res.json();
-            if (!res.ok) { showAlert('settings-alert', data.detail || '삭제 실패'); return; }
+            if (!isCurrentSession(session)) return;
             alert('계정이 삭제되었습니다.');
             closeSettings();
             logout();
-        } catch { showAlert('settings-alert', '서버 오류'); }
+        } catch (error) { reportRequestError(session, error, 'settings-alert'); }
     }
 
     window.onload = () => {

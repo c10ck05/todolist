@@ -20,6 +20,20 @@ from backend.schemas import EmailRequest, SignupRequest, LoginRequest, ResetPass
 router = APIRouter()
 
 
+def consume_verification(db: Session, verification, input_code: str):
+    """Claim a code exactly once, in the same transaction as the account change."""
+    removed = db.query(EmailVerificationTable).filter(
+        EmailVerificationTable.email == verification.email,
+        EmailVerificationTable.purpose == verification.purpose,
+        EmailVerificationTable.code == input_code,
+        EmailVerificationTable.expires_at == verification.expires_at,
+        EmailVerificationTable.expires_at > datetime.now(KST).replace(tzinfo=None),
+    ).delete(synchronize_session=False)
+    if removed != 1:
+        db.rollback()
+        raise HTTPException(400, '이미 사용되었거나 만료된 인증번호입니다. 다시 요청해주세요.')
+
+
 @router.post("/request-code")
 def request_verification_code(email_data: EmailRequest, request: Request, db: Session = Depends(get_db)):
     email_data = email_data.model_dump()
@@ -71,8 +85,8 @@ def signup_todo(user_data: SignupRequest, request: Request, db: Session = Depend
         raise HTTPException(status_code=400, detail="이미 해당 ID가 있습니다.")
 
     hashed = bcrypt.hashpw(raw_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    consume_verification(db, verification, input_code)
     db.add(UserTable(user_id=user_id, password=hashed, email=user_email))
-    db.delete(verification)
     try:
         db.commit()
     except IntegrityError:
@@ -154,7 +168,7 @@ def reset_password(reset_data: ResetPasswordRequest, request: Request, db: Sessi
         raise HTTPException(status_code=400, detail="인증번호가 일치하지 않습니다.")
 
     hashed = bcrypt.hashpw(reset_data.get("new_password").encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    consume_verification(db, verification, reset_data['code'])
     user_data.password = hashed
-    db.delete(verification)
     db.commit()
     return {"message": "비밀번호 변경이 완료되었습니다."}

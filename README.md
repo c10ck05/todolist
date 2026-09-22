@@ -232,6 +232,19 @@ ID는 새로 발급되며, 형식 오류나 저장 오류가 나면 전체 가�
 브라우저에서는 최대 10MB 파일을 허용합니다. 응답을 받지 못한 경우에는 중복 복원을
 피하도록 목록을 먼저 새로고침해 확인하세요.
 
+인증번호는 가입·재설정 변경과 같은 트랜잭션에서 조건부 삭제하여 한 번만 사용합니다.
+프론트는 로그인 세션이 바뀐 뒤 도착한 응답을 무시하고, 같은 항목의 저장·마감기한·
+완료·삭제 요청을 순서대로 처리합니다. 일괄 작업에서 실패한 항목은 목록에 유지됩니다.
+`GET /health`의 `revision`은 Render가 제공하는 배포 커밋이며, 로컬에서는 `local`입니다.
+
+회귀 테스트:
+
+```bash
+venv/bin/python -m unittest discover -s tests -v
+node tests/frontend_validation.cjs
+node tests/frontend_async.cjs
+```
+
 `index.html`을 브라우저로 열거나,  
 VS Code Live Server 등으로 `http://127.0.0.1:5500` 에서 실행
 
