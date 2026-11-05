@@ -40,10 +40,15 @@ function repeatEditor(todo) {
 }
 
 // 카테고리 필터 칩 + 입력 자동완성(datalist) 갱신
+let categoryViewKey = null;
 function renderCategoryChips() {
     const cats = getCategories();
+    if (!cats.length) currentCategory = 'all';
+    const key = JSON.stringify([cats, currentCategory]);
+    if (key === categoryViewKey) return;
+    categoryViewKey = key;
     const container = document.getElementById('category-filters');
-    if (cats.length === 0) { container.innerHTML = ''; currentCategory = 'all'; }
+    if (cats.length === 0) { container.innerHTML = ''; }
     else {
         const chips = [['all', '전체 카테고리'], ...cats.map(c => [c, c]), ['none', '미분류']];
         container.replaceChildren(...chips.map(([val, label]) => {
@@ -92,11 +97,19 @@ function restoreDetailDrafts() {
         if (select) changeRepeatType(todo.id, select.value);
     });
 }
-function render() {
-    renderCategoryChips();
+let searchRenderTimer = null;
+function scheduleSearchRender() {
+    if (searchRenderTimer !== null) clearTimeout(searchRenderTimer);
+    searchRenderTimer = setTimeout(() => {
+        searchRenderTimer = null;
+        render(true);
+    }, 100);
+}
+function render(searchOnly = false) {
+    if (!searchOnly) renderCategoryChips();
     if (viewMode === 'timeline') { renderTimeline(); return; }
     if (viewMode === 'calendar') { renderCalendar(); return; }
-    renderStats();
+    if (!searchOnly) renderStats();
     const list = document.getElementById('todo-list');
     const q = document.getElementById('search-input').value.trim().toLowerCase();
     let filtered = todos;
@@ -120,7 +133,8 @@ function render() {
             ? `<span class="deadline-chip ${overdue ? 'overdue' : ''}">${formatDeadline(t.deadline)}</span>`
             : '';
         const catHtml = t.category ? `<span class="category-badge"> ${escapeHtml(t.category)}</span>` : '';
-        const repeatHtml = repeatLabel(t.repeat) ? `<span class="repeat-icon"> ${escapeHtml(repeatLabel(t.repeat))}</span>` : '';
+        const repeat = repeatLabel(t.repeat);
+        const repeatHtml = repeat ? `<span class="repeat-icon"> ${escapeHtml(repeat)}</span>` : '';
         const memoHtml = t.detail ? `<span class="memo-icon" title="${escapeHtml(t.detail)}">메모</span>` : '';
         const dragAttrs = dragEnabled
             ? `draggable="true" ondragstart="onDragStart(event, ${t.id})" ondragend="onDragEnd(event)" ondragover="onDragOver(event, ${t.id})" ondragenter="onDragEnter(event, ${t.id})" ondragleave="onDragLeave(event)" ondrop="onDrop(event, ${t.id})"`

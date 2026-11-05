@@ -51,6 +51,20 @@ class EfficiencyTests(unittest.TestCase):
             self.assertTrue(response.json()['completed'])
             self.assertEqual(len(self.selects), 2)  # Auth plus joined subtask/owner check.
 
+    def test_list_uses_indexed_subtask_lookup(self):
+        with TestClient(isolated.app) as client:
+            parent = client.post('/todos', headers=self.headers, json={'content': 'index parent'}).json()
+            client.post(f"/todos/{parent['id']}/subtasks", headers=self.headers, json={'content': 'indexed child'})
+            self.selects.clear()
+            response = client.get('/todos', headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(self.selects), 3)  # Authentication, todos, indexed subtasks.
+            subtask_query = next(sql for sql in self.selects if 'FROM subtasks' in sql)
+            self.assertIn('subtasks.todo_id IN', subtask_query)
+            self.assertNotIn('JOIN todolist', subtask_query)
+            restored = next(todo for todo in response.json() if todo['id'] == parent['id'])
+            self.assertEqual(restored['subtasks'][0]['content'], 'indexed child')
+
     def test_shared_session_preserves_ownership_checks(self):
         from backend.models import SubtaskTable
         with SessionLocal() as db:

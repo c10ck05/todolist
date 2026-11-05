@@ -20,8 +20,10 @@ def todos_get(user: CurrentUser, db: DbSession):
     ).all()
     subtasks_by_todo = {}
     if todos:
-        subtasks = db.query(SubtaskTable).join(TodoTable, SubtaskTable.todo_id == TodoTable.id).filter(
-            TodoTable.owner_id == user_id
+        # Use the existing subtasks.todo_id index; avoid scanning other users' checklists.
+        todo_ids = [todo.id for todo in todos]
+        subtasks = db.query(SubtaskTable).filter(
+            SubtaskTable.todo_id.in_(todo_ids)
         ).order_by(SubtaskTable.id).all()
         for subtask in subtasks:
             subtasks_by_todo.setdefault(subtask.todo_id, []).append(subtask_dict(subtask))

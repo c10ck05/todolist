@@ -128,6 +128,42 @@ async function run() {
         f.pending[0].resolve(response([{ id: 1, detail: 'old' }])); await loading;
         assert.equal(f.todos()[0].detail, 'new');
     }
+    // Rapid search typing should render once, and a session reset must cancel stale work.
+    {
+        const f = fixture();
+        const timers = new Map(); let nextTimer = 0;
+        f.context.setTimeout = callback => { const id = ++nextTimer; timers.set(id, callback); return id; };
+        f.context.clearTimeout = id => timers.delete(id);
+        f.run('globalThis.searchRenderCount = 0; render = () => { globalThis.searchRenderCount++ }');
+        f.context.scheduleSearchRender();
+        f.context.scheduleSearchRender();
+        f.context.scheduleSearchRender();
+        assert.equal(timers.size, 1);
+        const callback = [...timers.values()][0];
+        timers.clear(); // The browser removes a timer before invoking its callback.
+        callback();
+        assert.equal(f.run('searchRenderCount'), 1);
+        f.context.scheduleSearchRender();
+        f.context.logout();
+        assert.equal(timers.size, 0);
+    }
+    // Search and other unrelated renders should not recreate unchanged category buttons.
+    {
+        const f = fixture(); let rebuilds = 0;
+        f.el('category-filters').replaceChildren = () => { rebuilds++; };
+        f.context.document.createElement = () => ({ className: '', textContent: '', addEventListener() {} });
+        f.run('todos = [{id: 1, category: "Work"}]');
+        f.context.renderCategoryChips();
+        f.context.renderCategoryChips();
+        assert.equal(rebuilds, 1);
+        f.run('todos[0].category = "Study"');
+        f.context.renderCategoryChips();
+        assert.equal(rebuilds, 2);
+        f.context.logout();
+        f.run('todos = [{id: 2, category: "Study"}]');
+        f.context.renderCategoryChips();
+        assert.equal(rebuilds, 3);
+    }
     console.log('Frontend session isolation, request ordering and bulk-failure checks passed.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

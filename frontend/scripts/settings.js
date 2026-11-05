@@ -1,4 +1,7 @@
 function resetSessionView() {
+    if (searchRenderTimer !== null) clearTimeout(searchRenderTimer);
+    searchRenderTimer = null;
+    categoryViewKey = null;
     sessionEpoch++;
     listRequestVersion++;
     detailDrafts.clear();
